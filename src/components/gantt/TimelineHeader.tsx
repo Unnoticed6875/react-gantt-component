@@ -12,7 +12,13 @@ interface TimelineHeaderProps {
     ganttHeaderHeight: number;
 }
 
-const TimelineHeader: React.FC<TimelineHeaderProps> = ({ startDate, endDate, columnWidth, viewMode, ganttHeaderHeight }) => {
+const TimelineHeader: React.FC<TimelineHeaderProps> = ({
+    startDate,
+    endDate,
+    columnWidth,
+    viewMode,
+    ganttHeaderHeight,
+}) => {
     let columns: React.ReactNode[] = [];
     // subHeaders might be used later for more complex headers (e.g. Year > Month > Week)
     // const subHeaders: React.ReactNode[] = []; 
@@ -83,14 +89,24 @@ const TimelineHeader: React.FC<TimelineHeaderProps> = ({ startDate, endDate, col
             break;
     }
 
+    // Ref for the inner div that holds the columns
+    const mainHeaderRef = React.useRef<HTMLDivElement>(null);
+
     return (
         <div
             className="gantt-timeline-header sticky top-0 z-10 bg-gray-200 flex border-b border-gray-300 select-none"
-            style={{ height: `${ganttHeaderHeight}px`, minHeight: `${ganttHeaderHeight}px` }}
+            style={{
+                height: `${ganttHeaderHeight}px`,
+                minHeight: `${ganttHeaderHeight}px`,
+                overflowX: 'hidden',
+            }}
         >
             {/* Render sub-headers if needed, e.g., months above weeks, or years above months */}
             {/* <div className="gantt-timeline-subheader flex">{subHeaders}</div> */}
-            <div className="gantt-timeline-mainheader flex">
+            <div
+                ref={mainHeaderRef}
+                className="gantt-timeline-mainheader flex"
+            >
                 {columns}
             </div>
         </div>

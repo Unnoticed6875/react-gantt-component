@@ -9,6 +9,7 @@ import { TaskList } from "./TaskList";
 import TimelineHeader from "./TimelineHeader";
 import Timeline from "./Timeline";
 import { getStartAndEndDates } from "./utils";
+import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 
 interface GanttChartProps {
     tasks: Task[];
@@ -25,42 +26,10 @@ const GanttChart: React.FC<GanttChartProps> = ({ tasks, rowHeight = DEFAULT_ROW_
     const [taskListWidth, setTaskListWidth] = React.useState(30);
     const [columnWidth, setColumnWidth] = React.useState(50);
     const [viewMode, setViewMode] = React.useState<ViewMode>("day"); // Default to day view
+    const [showGrid, setShowGrid] = React.useState(true); // State for grid visibility, default to true
 
-    // Fully commenting out this block
-    /*
-    const { projectStartDate, projectEndDate } = React.useMemo(() => {
-        if (!tasks || tasks.length === 0) {
-            const today = new Date();
-            return {
-                projectStartDate: today,
-                // projectEndDate: addDays(today, 30), // addDays would be undefined here
-                projectEndDate: new Date(today.setDate(today.getDate() + 30)), // simple alternative if needed
-            };
-        }
-        let minDate = tasks[0].start;
-        let maxDate = tasks[0].end;
-        tasks.forEach(task => {
-            if (task.start < minDate) minDate = task.start;
-            if (task.end > maxDate) maxDate = task.end;
-        });
-        // const paddedMinDate = addDays(minDate, -2); // addDays would be undefined
-        // const paddedMaxDate = addDays(maxDate, 2); // addDays would be undefined
-        const paddedMinDate = new Date(minDate.setDate(minDate.getDate() - 2));
-        const paddedMaxDate = new Date(maxDate.setDate(maxDate.getDate() + 2));
-        return {
-            projectStartDate: paddedMinDate,
-            projectEndDate: paddedMaxDate,
-        };
-    }, [tasks]);
-    */
-
-    // const timelineDates = React.useMemo(
-    //     () => getDatesBetween(projectStartDate, projectEndDate), // getDatesBetween would be undefined
-    //     [projectStartDate, projectEndDate]
-    // );
-
-    // const totalTimelineWidth = timelineDates.length * columnWidth;
-    const containerHeight = tasks.length * rowHeight + GANTT_HEADER_HEIGHT + 20;
+    // Calculate the total height needed for the scrollable content (headers + task rows)
+    const scrollableContentHeight = tasks.length * rowHeight + GANTT_HEADER_HEIGHT;
     const { overallMinDate, overallMaxDate } = useMemo(() => getStartAndEndDates(tasks), [tasks]);
 
     const getTaskBarStyle = (task: Task, index: number, calculatedStyle: CSSProperties): CSSProperties => {
@@ -90,7 +59,7 @@ const GanttChart: React.FC<GanttChartProps> = ({ tasks, rowHeight = DEFAULT_ROW_
     }
 
     return (
-        <div className="gantt-chart h-[600px] flex flex-col border rounded-lg" style={{ height: `${containerHeight}px` }}>
+        <div className="gantt-chart h-[600px] flex flex-col border rounded-lg">
             <div className="flex justify-end space-x-2 mb-2 p-2 border-b">
                 <button onClick={() => setViewMode("day")} className="p-1 border rounded text-xs hover:bg-gray-100">Day</button>
                 <button onClick={() => setViewMode("week")} className="p-1 border rounded text-xs hover:bg-gray-100">Week</button>
@@ -98,36 +67,47 @@ const GanttChart: React.FC<GanttChartProps> = ({ tasks, rowHeight = DEFAULT_ROW_
                 <button onClick={() => setViewMode("year")} className="p-1 border rounded text-xs hover:bg-gray-100">Year</button>
                 <button onClick={handleZoomIn} className="p-1 border rounded text-xs hover:bg-gray-100">Zoom In</button>
                 <button onClick={handleZoomOut} className="p-1 border rounded text-xs hover:bg-gray-100">Zoom Out</button>
+                <button onClick={() => setShowGrid(!showGrid)} className="p-1 border rounded text-xs hover:bg-gray-100">
+                    {showGrid ? "Hide Grid" : "Show Grid"}
+                </button>
             </div>
-            <ResizablePanelGroup direction="horizontal" className="flex-grow">
-                <ResizablePanel defaultSize={taskListWidth} minSize={20} maxSize={50} onResize={setTaskListWidth}>
-                    <div className="flex flex-col h-full">
-                        <TaskListHeader ganttHeaderHeight={GANTT_HEADER_HEIGHT} />
-                        <TaskList tasks={tasks} rowHeight={rowHeight} />
-                    </div>
-                </ResizablePanel>
-                <ResizableHandle withHandle />
-                <ResizablePanel defaultSize={100 - taskListWidth}>
-                    <div className="flex flex-col h-full w-full overflow-hidden">
-                        <TimelineHeader
-                            startDate={overallMinDate}
-                            endDate={overallMaxDate}
-                            columnWidth={columnWidth}
-                            viewMode={viewMode}
-                            ganttHeaderHeight={GANTT_HEADER_HEIGHT}
-                        />
-                        <Timeline
-                            tasks={tasks}
-                            startDate={overallMinDate}
-                            endDate={overallMaxDate}
-                            columnWidth={columnWidth}
-                            viewMode={viewMode}
-                            rowHeight={rowHeight}
-                            getTaskBarStyle={getTaskBarStyle}
-                        />
-                    </div>
-                </ResizablePanel>
-            </ResizablePanelGroup>
+            <div className="overflow-y-auto">
+                <div style={{ height: `${scrollableContentHeight}px` }}>
+                    <ResizablePanelGroup direction="horizontal" className="h-full">
+                        <ResizablePanel defaultSize={taskListWidth} minSize={20} maxSize={50} onResize={setTaskListWidth}>
+                            <div className="flex flex-col h-full">
+                                <TaskListHeader ganttHeaderHeight={GANTT_HEADER_HEIGHT} />
+                                <TaskList tasks={tasks} rowHeight={rowHeight} />
+                            </div>
+                        </ResizablePanel>
+                        <ResizableHandle withHandle />
+                        <ResizablePanel defaultSize={100 - taskListWidth}>
+                            <ScrollArea>
+                                <ScrollBar orientation="horizontal" />
+                                <TimelineHeader
+                                    startDate={overallMinDate}
+                                    endDate={overallMaxDate}
+                                    columnWidth={columnWidth}
+                                    viewMode={viewMode}
+                                    ganttHeaderHeight={GANTT_HEADER_HEIGHT}
+                                />
+                                <Timeline
+                                    key={`timeline-${showGrid}`}
+                                    tasks={tasks}
+                                    startDate={overallMinDate}
+                                    endDate={overallMaxDate}
+                                    columnWidth={columnWidth}
+                                    viewMode={viewMode}
+                                    rowHeight={rowHeight}
+                                    getTaskBarStyle={getTaskBarStyle}
+                                    showGrid={showGrid}
+                                />
+
+                            </ScrollArea>
+                        </ResizablePanel>
+                    </ResizablePanelGroup>
+                </div>
+            </div>
         </div>
     );
 }
