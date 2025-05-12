@@ -1,12 +1,14 @@
 // src/components/gantt/types.ts
+
 export interface Task {
   id: string;
   name: string;
   start: Date;
   end: Date;
   progress: number;
-  dependencies?: string[];
+  dependencies?: string[]; // IDs of tasks this task depends on
   milestone?: boolean;
+  type: "task" | "milestone";
 }
 
 // Assuming GanttTask might have more specific properties for the Gantt chart itself

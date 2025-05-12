@@ -30,6 +30,7 @@ export function TaskList({
                     <div className="w-1/2 truncate pl-4 pr-2">{task.name}</div>
                     <div className="w-1/4 text-xs text-center">{task.start.toLocaleDateString()}</div>
                     <div className="w-1/4 text-xs text-center pr-4">{task.end.toLocaleDateString()}</div>
+                    <div className="w-1/4 text-xs text-center pr-4">{task.dependencies?.map((dependency) => dependency).join(", ")}</div>
                 </div>
             ))}
         </div>
