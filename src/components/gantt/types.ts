@@ -27,4 +27,4 @@ export interface GanttLink {
   type: "FS" | "SS" | "EF" | "SF"; // Finish-to-Start, Start-to-Start, etc.
 }
 
-export type ViewMode = "day" | "week" | "month" | "year";
+export type ViewMode = "day" | "week" | "month" | "quarter" | "year";

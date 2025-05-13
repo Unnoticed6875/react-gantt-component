@@ -1,22 +1,22 @@
 "use client";
 
-import React from 'react';
+import React, { useLayoutEffect, useRef } from 'react';
 import {
     format,
-    differenceInDays,
+    differenceInCalendarDays,
     eachDayOfInterval,
     eachWeekOfInterval,
     eachMonthOfInterval,
+    eachQuarterOfInterval,
     eachYearOfInterval,
-    startOfWeek,
-    startOfMonth,
-    getDay,
-    getMonth,
     endOfWeek,
-    addMonths,
+    endOfMonth,
+    endOfQuarter,
+    endOfYear,
+    getDay,
+    getQuarter,
     min,
     max,
-    getYear,
 } from 'date-fns';
 import { ViewMode } from './types';
 
@@ -30,100 +30,133 @@ interface TimelineHeaderProps {
 
 const GANTT_HEADER_HEIGHT = 50;
 
-const getHeaderFormats = (viewMode: ViewMode, /* scale: number */) => {
+const getHeaderFormats = (viewMode: ViewMode) => {
     switch (viewMode) {
         case 'day':
             return { top: 'MMMM yyyy', bottom: 'd' };
         case 'week':
-            return { top: 'MMMM yyyy', bottom: '' };
+            return { top: 'MMMM yyyy', bottom: 'w' };
         case 'month':
             return { top: 'yyyy', bottom: 'MMMM' };
+        case 'quarter':
+            return { top: 'yyyy', bottom: '' };
         case 'year':
             return { top: '', bottom: 'yyyy' };
         default:
-            return { top: '', bottom: '' };
+            return { top: 'MMMM yyyy', bottom: 'd' };
     }
+};
+
+const getVisibleDays = (d1: Date, d2: Date, ganttStart: Date, ganttEnd: Date): number => {
+    const effectiveStart = max([d1, ganttStart]);
+    const effectiveEnd = min([d2, ganttEnd]);
+    if (effectiveStart > effectiveEnd) return 0;
+    return differenceInCalendarDays(effectiveEnd, effectiveStart) + 1;
 };
 
 const TimelineHeader: React.FC<TimelineHeaderProps> = ({
     viewMode,
-    startDate,
-    endDate,
+    startDate: ganttStartDate,
+    endDate: ganttEndDate,
     scale,
     scrollLeft,
 }) => {
-    const topHeaderRef = React.useRef<HTMLDivElement>(null);
-    const bottomHeaderRef = React.useRef<HTMLDivElement>(null);
+    const topHeaderRef = useRef<HTMLDivElement>(null);
+    const bottomHeaderRef = useRef<HTMLDivElement>(null);
 
-    const formats = getHeaderFormats(viewMode /*, scale */);
-    const topHeaders: React.ReactNode[] = [];
-    const bottomColumns: React.ReactNode[] = [];
+    useLayoutEffect(() => {
+        if (topHeaderRef.current) {
+            topHeaderRef.current.style.transform = `translateX(-${scrollLeft}px)`;
+        }
+        if (bottomHeaderRef.current) {
+            bottomHeaderRef.current.style.transform = `translateX(-${scrollLeft}px)`;
+        }
+    }, [scrollLeft]);
+
+    const formats = getHeaderFormats(viewMode);
+    const topHeaderCells: React.JSX.Element[] = [];
+    const bottomHeaderCells: React.JSX.Element[] = [];
 
     const totalHeaderHeight = GANTT_HEADER_HEIGHT;
-    const topHeaderHeight = viewMode === 'year' ? 0 : Math.floor(totalHeaderHeight * 0.4);
+    const topHeaderHeight = formats.top ? Math.floor(totalHeaderHeight * 0.4) : 0;
     const bottomHeaderHeight = totalHeaderHeight - topHeaderHeight;
-
-    const totalDays = differenceInDays(endDate, startDate) + 1;
-    const totalWidth = totalDays * scale;
 
     const commonCellStyle: React.CSSProperties = {
         display: 'flex',
         alignItems: 'center',
         justifyContent: 'center',
         borderRight: '1px solid var(--gantt-border-color, #e5e7eb)',
-        fontSize: '0.8rem',
+        fontSize: '0.75rem',
         overflow: 'hidden',
         whiteSpace: 'nowrap',
         boxSizing: 'border-box',
+        textOverflow: 'ellipsis',
     };
+
+    const topCellStyle: React.CSSProperties = {
+        ...commonCellStyle,
+        height: `${topHeaderHeight}px`,
+        backgroundColor: 'var(--gantt-header-bg-top, #f9fafb)',
+        fontWeight: '600',
+        color: 'var(--gantt-header-text-top, #374151)',
+        borderBottom: topHeaderHeight > 0 ? '1px solid var(--gantt-border-color, #e5e7eb)' : 'none',
+    };
+
+    const bottomCellStyleBase: React.CSSProperties = {
+        ...commonCellStyle,
+        height: `${bottomHeaderHeight}px`,
+        backgroundColor: 'var(--gantt-header-bg-bottom, #ffffff)',
+        color: 'var(--gantt-header-text-bottom, #4b5563)',
+    };
+    if (topHeaderHeight === 0 && bottomHeaderHeight > 0) {
+        bottomCellStyleBase.borderTop = '1px solid var(--gantt-border-color, #e5e7eb)';
+    }
+
+    const overallTotalDays = differenceInCalendarDays(ganttEndDate, ganttStartDate) + 1;
+    const totalWidth = overallTotalDays * scale;
 
     switch (viewMode) {
         case 'day': {
-            const days = eachDayOfInterval({ start: startDate, end: endDate });
-            let currentMonth = -1;
+            const days = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
+            let currentMonthYearLabel = "";
             let currentMonthWidth = 0;
 
             days.forEach((day, index) => {
-                bottomColumns.push(
+                const dayWidth = scale;
+                bottomHeaderCells.push(
                     <div
-                        key={`bottom-${index}`}
-                        style={{ ...commonCellStyle, minWidth: scale, width: scale, height: `${bottomHeaderHeight}px`, backgroundColor: (getDay(day) === 0 || getDay(day) === 6) ? 'var(--gantt-weekend-bg, #f9fafb)' : 'inherit', borderTop: '1px solid var(--gantt-border-color, #e5e7eb)' }}
-                        className="gantt-timeline-header-column text-xs font-medium text-gray-600 dark:text-gray-400"
+                        key={`day-bottom-${index}`}
+                        style={{
+                            ...bottomCellStyleBase,
+                            width: dayWidth,
+                            minWidth: dayWidth,
+                            backgroundColor: (getDay(day) === 0 || getDay(day) === 6) ? 'var(--gantt-weekend-bg, #f3f4f6)' : bottomCellStyleBase.backgroundColor,
+                        }}
                         title={format(day, 'EEEE, MMM d, yyyy')}
                     >
                         {format(day, formats.bottom)}
                     </div>
                 );
 
-                const month = getMonth(day);
-                if (month !== currentMonth) {
-                    if (currentMonth !== -1) {
-                        const monthStartDate = startOfMonth(addMonths(day, -1));
-                        topHeaders.push(
-                            <div
-                                key={`top-${currentMonth}`}
-                                style={{ ...commonCellStyle, width: currentMonthWidth, minWidth: currentMonthWidth, height: `${topHeaderHeight}px`, justifyContent: 'center' }}
-                                className="gantt-timeline-header-top text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700"
-                            >
-                                {format(monthStartDate, formats.top)}
+                const monthYearLabel = format(day, formats.top);
+                if (monthYearLabel !== currentMonthYearLabel) {
+                    if (currentMonthYearLabel) {
+                        topHeaderCells.push(
+                            <div key={`day-top-${currentMonthYearLabel}`} style={{ ...topCellStyle, width: currentMonthWidth, minWidth: currentMonthWidth }}>
+                                {currentMonthYearLabel}
                             </div>
                         );
                     }
-                    currentMonth = month;
-                    currentMonthWidth = scale;
+                    currentMonthYearLabel = monthYearLabel;
+                    currentMonthWidth = dayWidth;
                 } else {
-                    currentMonthWidth += scale;
+                    currentMonthWidth += dayWidth;
                 }
 
                 if (index === days.length - 1) {
-                    const monthStartDate = startOfMonth(day);
-                    topHeaders.push(
-                        <div
-                            key={`top-${currentMonth}`}
-                            style={{ ...commonCellStyle, width: currentMonthWidth, minWidth: currentMonthWidth, height: `${topHeaderHeight}px`, justifyContent: 'center' }}
-                            className="gantt-timeline-header-top text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700"
-                        >
-                            {format(monthStartDate, formats.top)}
+                    topHeaderCells.push(
+                        <div key={`day-top-${currentMonthYearLabel}-last`} style={{ ...topCellStyle, width: currentMonthWidth, minWidth: currentMonthWidth }}>
+                            {currentMonthYearLabel}
                         </div>
                     );
                 }
@@ -131,64 +164,56 @@ const TimelineHeader: React.FC<TimelineHeaderProps> = ({
             break;
         }
         case 'week': {
-            const weeks = eachWeekOfInterval({ start: startDate, end: endDate }, { weekStartsOn: 1 });
-            let currentMonthYear = -1;
-            let currentMonthYearWidth = 0;
+            const weeks = eachWeekOfInterval({ start: ganttStartDate, end: ganttEndDate }, { weekStartsOn: 1 });
+            let currentMonthYearLabel = "";
+            let currentMonthWidth = 0;
 
-            weeks.forEach((weekStartRaw, index) => {
-                const weekStart = startOfWeek(weekStartRaw);
-                const weekEnd = endOfWeek(weekStart, { weekStartsOn: 1 });
+            weeks.forEach((weekStartOriginal, index) => {
+                const weekEndOriginal = endOfWeek(weekStartOriginal, { weekStartsOn: 1 });
 
-                const displayStartDate = max([weekStart, startDate]);
-                const displayEndDate = min([weekEnd, endDate]);
-                const daysInView = differenceInDays(displayEndDate, displayStartDate) + 1;
-                const columnActualWidth = daysInView * scale;
+                const daysInWeek = getVisibleDays(weekStartOriginal, weekEndOriginal, ganttStartDate, ganttEndDate);
+                if (daysInWeek === 0) return;
 
-                let label = `W${format(weekStart, 'w')}`;
-                if (scale * 7 > 70) {
-                    label += ` (${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d')})`;
+                const weekWidth = daysInWeek * scale;
+
+                let weekLabel = `W${format(weekStartOriginal, formats.bottom)}`;
+                if (weekWidth > 80) {
+                    const displayWeekStart = max([weekStartOriginal, ganttStartDate]);
+                    const displayWeekEnd = min([weekEndOriginal, ganttEndDate]);
+                    weekLabel = `${format(displayWeekStart, 'MMM d')} - ${format(displayWeekEnd, 'MMM d')}`;
+                } else if (weekWidth < 30) {
+                    weekLabel = format(weekStartOriginal, formats.bottom);
                 }
 
-                bottomColumns.push(
+                bottomHeaderCells.push(
                     <div
-                        key={`bottom-${index}`}
-                        style={{ ...commonCellStyle, minWidth: columnActualWidth, width: columnActualWidth, height: `${bottomHeaderHeight}px`, borderTop: '1px solid var(--gantt-border-color, #e5e7eb)' }}
-                        className="gantt-timeline-header-column text-xs font-medium text-gray-600 dark:text-gray-400"
-                        title={`${format(weekStart, 'MMM d')} - ${format(weekEnd, 'MMM d, yyyy')}`}
+                        key={`week-bottom-${index}`}
+                        style={{ ...bottomCellStyleBase, width: weekWidth, minWidth: weekWidth }}
+                        title={`${format(weekStartOriginal, 'MMM d')} - ${format(weekEndOriginal, 'MMM d, yyyy')}`}
                     >
-                        {label}
+                        {weekLabel}
                     </div>
                 );
 
-                const monthYearKey = parseInt(format(weekStart, 'yyyyMM'));
-                if (monthYearKey !== currentMonthYear) {
-                    if (currentMonthYear !== -1) {
-                        const spanStartDate = startOfMonth(new Date(Math.floor(currentMonthYear / 100), (currentMonthYear % 100) - 1, 1));
-                        topHeaders.push(
-                            <div
-                                key={`top-${currentMonthYear}`}
-                                style={{ ...commonCellStyle, width: currentMonthYearWidth, minWidth: currentMonthYearWidth, height: `${topHeaderHeight}px`, justifyContent: 'center' }}
-                                className="gantt-timeline-header-top text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700"
-                            >
-                                {format(spanStartDate, formats.top)}
+                const monthYearLabel = format(weekStartOriginal, formats.top);
+                if (monthYearLabel !== currentMonthYearLabel) {
+                    if (currentMonthYearLabel) {
+                        topHeaderCells.push(
+                            <div key={`week-top-${currentMonthYearLabel}-${index - 1}`} style={{ ...topCellStyle, width: currentMonthWidth, minWidth: currentMonthWidth }}>
+                                {currentMonthYearLabel}
                             </div>
                         );
                     }
-                    currentMonthYear = monthYearKey;
-                    currentMonthYearWidth = columnActualWidth;
+                    currentMonthYearLabel = monthYearLabel;
+                    currentMonthWidth = weekWidth;
                 } else {
-                    currentMonthYearWidth += columnActualWidth;
+                    currentMonthWidth += weekWidth;
                 }
 
                 if (index === weeks.length - 1) {
-                    const spanStartDate = startOfMonth(weekStart);
-                    topHeaders.push(
-                        <div
-                            key={`top-${currentMonthYear}`}
-                            style={{ ...commonCellStyle, width: currentMonthYearWidth, minWidth: currentMonthYearWidth, height: `${topHeaderHeight}px`, justifyContent: 'center' }}
-                            className="gantt-timeline-header-top text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700"
-                        >
-                            {format(spanStartDate, formats.top)}
+                    topHeaderCells.push(
+                        <div key={`week-top-${currentMonthYearLabel}-last`} style={{ ...topCellStyle, width: currentMonthWidth, minWidth: currentMonthWidth }}>
+                            {currentMonthYearLabel}
                         </div>
                     );
                 }
@@ -196,58 +221,94 @@ const TimelineHeader: React.FC<TimelineHeaderProps> = ({
             break;
         }
         case 'month': {
-            const months = eachMonthOfInterval({ start: startDate, end: endDate });
-            let currentYear = -1;
+            const months = eachMonthOfInterval({ start: ganttStartDate, end: ganttEndDate });
+            let currentYearLabel = "";
             let currentYearWidth = 0;
 
-            months.forEach((monthStartRaw, index) => {
-                const monthStart = startOfWeek(monthStartRaw);
-                const monthEnd = endOfWeek(monthStart, { weekStartsOn: 1 });
+            months.forEach((monthStartOriginal, index) => {
+                const monthEndOriginal = endOfMonth(monthStartOriginal);
+                const daysInMonth = getVisibleDays(monthStartOriginal, monthEndOriginal, ganttStartDate, ganttEndDate);
+                if (daysInMonth === 0) return;
 
-                const displayStartDate = max([monthStart, startDate]);
-                const displayEndDate = min([monthEnd, endDate]);
-                const daysInView = differenceInDays(displayEndDate, displayStartDate) + 1;
-                const columnActualWidth = daysInView * scale;
+                const monthWidth = daysInMonth * scale;
 
-                bottomColumns.push(
+                bottomHeaderCells.push(
                     <div
-                        key={`bottom-${index}`}
-                        style={{ ...commonCellStyle, minWidth: columnActualWidth, width: columnActualWidth, height: `${bottomHeaderHeight}px`, borderTop: '1px solid var(--gantt-border-color, #e5e7eb)' }}
-                        className="gantt-timeline-header-column text-xs font-medium text-gray-600 dark:text-gray-400"
+                        key={`month-bottom-${index}`}
+                        style={{ ...bottomCellStyleBase, width: monthWidth, minWidth: monthWidth }}
+                        title={format(monthStartOriginal, 'MMMM yyyy')}
                     >
-                        {format(monthStart, formats.bottom)}
+                        {format(monthStartOriginal, formats.bottom)}
                     </div>
                 );
 
-                const year = getYear(monthStart);
-                if (year !== currentYear) {
-                    if (currentYear !== -1) {
-                        const yearStartDate = new Date(currentYear, 0, 1);
-                        topHeaders.push(
-                            <div
-                                key={`top-${currentYear}`}
-                                style={{ ...commonCellStyle, width: currentYearWidth, minWidth: currentYearWidth, height: `${topHeaderHeight}px`, justifyContent: 'center' }}
-                                className="gantt-timeline-header-top text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700"
-                            >
-                                {format(yearStartDate, formats.top)}
+                const yearLabel = format(monthStartOriginal, formats.top);
+                if (yearLabel !== currentYearLabel) {
+                    if (currentYearLabel) {
+                        topHeaderCells.push(
+                            <div key={`month-top-${currentYearLabel}-${index - 1}`} style={{ ...topCellStyle, width: currentYearWidth, minWidth: currentYearWidth }}>
+                                {currentYearLabel}
                             </div>
                         );
                     }
-                    currentYear = year;
-                    currentYearWidth = columnActualWidth;
+                    currentYearLabel = yearLabel;
+                    currentYearWidth = monthWidth;
                 } else {
-                    currentYearWidth += columnActualWidth;
+                    currentYearWidth += monthWidth;
                 }
 
                 if (index === months.length - 1) {
-                    const yearStartDate = new Date(currentYear, 0, 1);
-                    topHeaders.push(
-                        <div
-                            key={`top-${currentYear}`}
-                            style={{ ...commonCellStyle, width: currentYearWidth, minWidth: currentYearWidth, height: `${topHeaderHeight}px`, justifyContent: 'center' }}
-                            className="gantt-timeline-header-top text-xs font-semibold text-gray-700 dark:text-gray-300 bg-gray-50 dark:bg-gray-700"
-                        >
-                            {format(yearStartDate, formats.top)}
+                    topHeaderCells.push(
+                        <div key={`month-top-${currentYearLabel}-last`} style={{ ...topCellStyle, width: currentYearWidth, minWidth: currentYearWidth }}>
+                            {currentYearLabel}
+                        </div>
+                    );
+                }
+            });
+            break;
+        }
+        case 'quarter': {
+            const quarters = eachQuarterOfInterval({ start: ganttStartDate, end: ganttEndDate });
+            let currentYearLabel = "";
+            let currentYearWidth = 0;
+
+            quarters.forEach((quarterStartOriginal, index) => {
+                const quarterEndOriginal = endOfQuarter(quarterStartOriginal);
+                const daysInQuarter = getVisibleDays(quarterStartOriginal, quarterEndOriginal, ganttStartDate, ganttEndDate);
+                if (daysInQuarter === 0) return;
+
+                const quarterWidth = daysInQuarter * scale;
+                const quarterNum = getQuarter(quarterStartOriginal);
+
+                bottomHeaderCells.push(
+                    <div
+                        key={`quarter-bottom-${index}`}
+                        style={{ ...bottomCellStyleBase, width: quarterWidth, minWidth: quarterWidth }}
+                        title={`Q${quarterNum} ${format(quarterStartOriginal, 'yyyy')}`}
+                    >
+                        {`Q${quarterNum}`}
+                    </div>
+                );
+
+                const yearLabel = format(quarterStartOriginal, formats.top);
+                if (yearLabel !== currentYearLabel) {
+                    if (currentYearLabel) {
+                        topHeaderCells.push(
+                            <div key={`quarter-top-${currentYearLabel}-${index - 1}`} style={{ ...topCellStyle, width: currentYearWidth, minWidth: currentYearWidth }}>
+                                {currentYearLabel}
+                            </div>
+                        );
+                    }
+                    currentYearLabel = yearLabel;
+                    currentYearWidth = quarterWidth;
+                } else {
+                    currentYearWidth += quarterWidth;
+                }
+
+                if (index === quarters.length - 1) {
+                    topHeaderCells.push(
+                        <div key={`quarter-top-${currentYearLabel}-last`} style={{ ...topCellStyle, width: currentYearWidth, minWidth: currentYearWidth }}>
+                            {currentYearLabel}
                         </div>
                     );
                 }
@@ -255,63 +316,53 @@ const TimelineHeader: React.FC<TimelineHeaderProps> = ({
             break;
         }
         case 'year': {
-            const years = eachYearOfInterval({ start: startDate, end: endDate });
-            years.forEach((yearStartRaw, index) => {
-                const yearStart = startOfWeek(yearStartRaw);
-                const yearEnd = endOfWeek(yearStart, { weekStartsOn: 1 });
+            const years = eachYearOfInterval({ start: ganttStartDate, end: ganttEndDate });
+            years.forEach((yearStartOriginal, index) => {
+                const yearEndOriginal = endOfYear(yearStartOriginal);
+                const daysInYear = getVisibleDays(yearStartOriginal, yearEndOriginal, ganttStartDate, ganttEndDate);
+                if (daysInYear === 0) return;
 
-                const displayStartDate = max([yearStart, startDate]);
-                const displayEndDate = min([yearEnd, endDate]);
-                const daysInView = differenceInDays(displayEndDate, displayStartDate) + 1;
-                const columnActualWidth = daysInView * scale;
+                const yearWidth = daysInYear * scale;
 
-                bottomColumns.push(
+                bottomHeaderCells.push(
                     <div
-                        key={`bottom-${index}`}
-                        style={{ ...commonCellStyle, minWidth: columnActualWidth, width: columnActualWidth, height: `${bottomHeaderHeight}px`, borderTop: '1px solid var(--gantt-border-color, #e5e7eb)' }}
-                        className="gantt-timeline-header-column text-xs font-semibold text-gray-700 dark:text-gray-300"
+                        key={`year-bottom-${index}`}
+                        style={{ ...bottomCellStyleBase, width: yearWidth, minWidth: yearWidth }}
+                        title={format(yearStartOriginal, 'yyyy')}
                     >
-                        {format(yearStart, formats.bottom)}
+                        {format(yearStartOriginal, formats.bottom)}
                     </div>
                 );
             });
             break;
         }
+        default:
+            break;
     }
 
     return (
         <div
-            className="gantt-timeline-header sticky top-0 z-10 bg-gray-50 dark:bg-gray-800 border-b border-l border-gray-300 dark:border-gray-700 select-none"
+            className="gantt-timeline-header sticky top-0 z-10 select-none"
             style={{
                 height: `${totalHeaderHeight}px`,
-                minHeight: `${totalHeaderHeight}px`,
-                overflow: 'hidden',
+                borderBottom: '1px solid var(--gantt-border-color, #d1d5db)',
             }}
         >
-            <div
-                className="relative"
-                style={{
-                    width: `${totalWidth}px`,
-                    height: `${totalHeaderHeight}px`,
-                    transform: `translateX(-${scrollLeft}px)`,
-                }}
-            >
-                {topHeaders.length > 0 && (
-                    <div
-                        ref={topHeaderRef}
-                        className="gantt-timeline-topheader absolute top-0 left-0 flex"
-                        style={{ width: `${totalWidth}px`, height: `${topHeaderHeight}px` }}
-                    >
-                        {topHeaders}
-                    </div>
-                )}
+            {topHeaderHeight > 0 && (
                 <div
-                    ref={bottomHeaderRef}
-                    className="gantt-timeline-bottomheader absolute bottom-0 left-0 flex"
-                    style={{ width: `${totalWidth}px`, height: `${bottomHeaderHeight}px` }}
+                    className="gantt-timeline-header-top-row flex"
+                    style={{ width: totalWidth, height: `${topHeaderHeight}px` }}
+                    ref={topHeaderRef}
                 >
-                    {bottomColumns}
+                    {topHeaderCells}
                 </div>
+            )}
+            <div
+                className="gantt-timeline-header-bottom-row flex"
+                style={{ width: totalWidth, height: `${bottomHeaderHeight}px` }}
+                ref={bottomHeaderRef}
+            >
+                {bottomHeaderCells}
             </div>
         </div>
     );

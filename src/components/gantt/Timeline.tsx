@@ -1,13 +1,27 @@
 "use client";
 
 import React from 'react';
-import { Task } from './types';
+import { Task, ViewMode } from './types';
 import { TaskBar } from "./TaskBar";
-import { differenceInDays, addDays } from 'date-fns';
+import {
+    differenceInCalendarDays,
+    addDays,
+    eachDayOfInterval,
+    eachWeekOfInterval,
+    eachMonthOfInterval,
+    eachQuarterOfInterval,
+    eachYearOfInterval,
+    startOfWeek,
+    startOfMonth,
+    startOfQuarter,
+    startOfYear,
+    max,
+    min,
+} from 'date-fns';
 import DependencyArrows from './DependencyArrows';
 
 interface TimelineProps {
-    // viewMode: 'Day' | 'Week' | 'Month' | 'Year'; // Removed as it's unused in this component
+    viewMode: ViewMode;
     tasks: Task[];
     startDate: Date;
     endDate: Date;
@@ -26,10 +40,10 @@ interface TaskPosition {
 }
 
 const Timeline: React.FC<TimelineProps> = ({
-    // viewMode, // Removed
+    viewMode,
     tasks,
-    startDate,
-    endDate,
+    startDate: ganttStartDate,
+    endDate: ganttEndDate,
     rowHeight,
     taskHeight,
     scale,
@@ -37,23 +51,64 @@ const Timeline: React.FC<TimelineProps> = ({
     getTaskBarStyle,
     showGrid = true,
 }) => {
-    const totalDays = differenceInDays(endDate, startDate) + 1;
-    const preciseTimelineWidth = totalDays * scale;
+    const totalTimelineDays = differenceInCalendarDays(ganttEndDate, ganttStartDate) + 1;
+    const preciseTimelineWidth = totalTimelineDays * scale;
 
     const taskPositions: Record<string, TaskPosition> = {};
+
+    const renderVerticalGridLines = () => {
+        if (!showGrid) return null;
+        const lines: React.JSX.Element[] = [];
+
+        if (scale >= 3) {
+            const days = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
+            days.forEach((day, index) => {
+                lines.push(
+                    <div
+                        key={`fine-grid-col-${index}`}
+                        className="absolute top-0 bottom-0 border-r border-gray-200 dark:border-gray-700 opacity-50"
+                        style={{ left: index * scale, width: scale }}
+                    />
+                );
+            });
+        }
+
+        let majorIntervals: Date[] = [];
+        if (viewMode === 'day' && scale < 3) {
+            majorIntervals = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
+        } else if (viewMode === 'week') {
+            majorIntervals = eachWeekOfInterval({ start: ganttStartDate, end: ganttEndDate }, { weekStartsOn: 1 }).map(d => startOfWeek(d, { weekStartsOn: 1 }));
+        } else if (viewMode === 'month') {
+            majorIntervals = eachMonthOfInterval({ start: ganttStartDate, end: ganttEndDate }).map(d => startOfMonth(d));
+        } else if (viewMode === 'quarter') {
+            majorIntervals = eachQuarterOfInterval({ start: ganttStartDate, end: ganttEndDate }).map(d => startOfQuarter(d));
+        } else if (viewMode === 'year') {
+            majorIntervals = eachYearOfInterval({ start: ganttStartDate, end: ganttEndDate }).map(d => startOfYear(d));
+        }
+
+        majorIntervals.forEach((intervalStart, index) => {
+            const offsetDays = differenceInCalendarDays(intervalStart, ganttStartDate);
+            if (offsetDays < 0) return;
+
+            const position = offsetDays * scale;
+            if (position < preciseTimelineWidth) {
+                lines.push(
+                    <div
+                        key={`major-grid-col-${viewMode}-${index}`}
+                        className="absolute top-0 bottom-0 border-r border-gray-300 dark:border-gray-500"
+                        style={{ left: position, width: 0 }}
+                    />
+                );
+            }
+        });
+        return lines;
+    };
 
     return (
         <div className="flex flex-col h-full w-full">
             <div className="relative" style={{ width: `${preciseTimelineWidth}px`, height: `${tasks.length * rowHeight}px` }}>
-                {/* Grid Lines (Vertical) */}
-                {showGrid && Array.from({ length: totalDays }).map((_, index) => (
-                    <div
-                        key={`grid-col-${index}`}
-                        className="absolute top-0 bottom-0 border-r border-gray-200 dark:border-gray-600"
-                        style={{ left: index * scale, width: scale }}
-                    />
-                ))}
-                {/* Horizontal Grid Lines (per task row) */}
+                {renderVerticalGridLines()}
+
                 {showGrid && tasks.map((_, index) => (
                     <div
                         key={`grid-row-${index}`}
@@ -62,20 +117,22 @@ const Timeline: React.FC<TimelineProps> = ({
                     />
                 ))}
 
-                {/* Task Bars */}
                 {tasks.map((task, index) => {
                     const { start: taskStart, end: taskEnd } = getTaskDate(task);
-                    const taskStartOffsetDays = differenceInDays(taskStart, startDate);
-                    const taskDurationDays = differenceInDays(addDays(taskEnd, 1), taskStart);
 
-                    if (taskStartOffsetDays < 0 || taskStart > endDate) {
-                        console.warn(`Task ${task.id} is outside the current timeline range.`);
-                        return null;
-                    }
+                    const effectiveTaskStart = max([taskStart, ganttStartDate]);
+                    const effectiveTaskEnd = min([taskEnd, ganttEndDate]);
+
+                    if (effectiveTaskStart > effectiveTaskEnd) return null;
+
+                    const taskStartOffsetDays = differenceInCalendarDays(effectiveTaskStart, ganttStartDate);
+                    const taskDurationDays = differenceInCalendarDays(addDays(effectiveTaskEnd, 1), effectiveTaskStart);
+
+                    if (taskDurationDays <= 0) return null;
 
                     const x = taskStartOffsetDays * scale;
                     const y = index * rowHeight + (rowHeight - taskHeight) / 2;
-                    const width = taskDurationDays * scale;
+                    const width = Math.max(0, taskDurationDays * scale - 1);
 
                     taskPositions[task.id] = { x, y, width };
 
@@ -99,7 +156,6 @@ const Timeline: React.FC<TimelineProps> = ({
                     );
                 })}
 
-                {/* Render Dependency Arrows */}
                 <DependencyArrows
                     tasks={tasks}
                     taskPositions={taskPositions}
