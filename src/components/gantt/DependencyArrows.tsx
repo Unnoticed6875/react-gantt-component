@@ -31,15 +31,15 @@ const DependencyArrows: React.FC<DependencyArrowsProps> = ({
 
     // Pre-calculate successor counts for each task
     // A task's "successor count" is the number of other tasks that depend on it.
-    const successorCounts: Record<string, number> = {};
-    tasks.forEach(currentTask => { // Iterate through all tasks to find their dependencies
-        if (currentTask.dependencies) {
-            currentTask.dependencies.forEach(predecessorId => {
-                // If currentTask depends on predecessorId, then predecessorId has currentTask as a successor.
-                successorCounts[predecessorId] = (successorCounts[predecessorId] || 0) + 1;
-            });
-        }
-    });
+    // const successorCounts: Record<string, number> = {};
+    // tasks.forEach(currentTask => { // Iterate through all tasks to find their dependencies
+    //     if (currentTask.dependencies) {
+    //         currentTask.dependencies.forEach(predecessorId => {
+    //             // If currentTask depends on predecessorId, then predecessorId has currentTask as a successor.
+    //             successorCounts[predecessorId] = (successorCounts[predecessorId] || 0) + 1;
+    //         });
+    //     }
+    // });
 
     tasks.forEach((task) => { // task is the successor task
         const deps = task.dependencies;

@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { GanttTask } from "./types";
+import { Task } from "./types";
 import { Progress } from "@/components/ui/progress";
 
 interface TaskBarProps {
-    task: GanttTask;
+    task: Task;
     taskBarStyle: React.CSSProperties;
-    onTaskBarClick?: (task: GanttTask) => void; // Optional: for future interactions
+    onTaskBarClick?: (task: Task) => void; // Optional: for future interactions
     // TODO: Add props for resizing, dragging, etc.
 }
 

@@ -1,12 +1,13 @@
-import { GanttTask } from "@/components/gantt/types";
+import { Task } from "@/components/gantt/types";
 
-export const myTasks: GanttTask[] = [
+export const myTasks: Task[] = [
   {
     id: "t1",
     name: "Initial Planning",
     start: new Date(2025, 3, 20),
     end: new Date(2025, 4, 5),
     progress: 100,
+    type: "task",
   },
   {
     id: "t2",
@@ -15,6 +16,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 4, 10),
     progress: 75,
     dependencies: ["t1"],
+    type: "task",
   },
   {
     id: "t3",
@@ -23,6 +25,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 4, 18),
     progress: 40,
     dependencies: ["t2"],
+    type: "task",
   },
   {
     id: "t4",
@@ -31,6 +34,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 4, 28),
     progress: 20,
     dependencies: ["t3"],
+    type: "task",
   },
   {
     id: "t5",
@@ -39,6 +43,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 5, 10),
     progress: 10,
     dependencies: ["t3"],
+    type: "task",
   },
   {
     id: "t6",
@@ -46,6 +51,7 @@ export const myTasks: GanttTask[] = [
     start: new Date(2025, 3, 22),
     end: new Date(2025, 4, 6),
     progress: 90,
+    type: "task",
   },
   {
     id: "t7",
@@ -53,7 +59,7 @@ export const myTasks: GanttTask[] = [
     start: new Date(2025, 4, 29),
     end: new Date(2025, 4, 30),
     progress: 0,
-    // type: "milestone",
+    type: "milestone",
     dependencies: ["t4", "t5"],
   },
   {
@@ -63,6 +69,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 4, 20),
     progress: 15,
     dependencies: ["t2"],
+    type: "task",
   },
   {
     id: "t9",
@@ -71,6 +78,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 5, 15),
     progress: 0,
     dependencies: ["t7"],
+    type: "task",
   },
   {
     id: "t10",
@@ -79,6 +87,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 4, 27),
     progress: 5,
     dependencies: ["t1"],
+    type: "task",
   },
   {
     id: "t11",
@@ -87,6 +96,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 5, 20),
     progress: 0,
     dependencies: ["t9", "t8"],
+    type: "task",
   },
   {
     id: "t12",
@@ -95,6 +105,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 4, 3),
     progress: 50,
     dependencies: ["t1"],
+    type: "task",
   },
   {
     id: "t13",
@@ -103,6 +114,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 5, 25),
     progress: 0,
     dependencies: ["t11"],
+    type: "task",
   },
   {
     id: "t14",
@@ -111,6 +123,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 5, 30),
     progress: 0,
     dependencies: ["t13"],
+    type: "task",
   },
   {
     id: "t15",
@@ -119,6 +132,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 6, 10),
     progress: 0,
     dependencies: ["t14"],
+    type: "task",
   },
   {
     id: "t16",
@@ -127,6 +141,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 6, 8),
     progress: 0,
     dependencies: ["t13"],
+    type: "task",
   },
   {
     id: "t17",
@@ -135,6 +150,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 6, 18),
     progress: 0,
     dependencies: ["t16"],
+    type: "task",
   },
   {
     id: "t18",
@@ -143,6 +159,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 6, 25),
     progress: 0,
     dependencies: ["t15", "t17"],
+    type: "task",
   },
   {
     id: "t19",
@@ -151,6 +168,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 6, 30),
     progress: 0,
     dependencies: ["t18"],
+    type: "task",
   },
   {
     id: "t20",
@@ -159,6 +177,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 7, 5),
     progress: 0,
     dependencies: ["t19"],
+    type: "task",
   },
   {
     id: "t21",
@@ -167,6 +186,7 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 7, 8),
     progress: 0,
     dependencies: ["t20"],
+    type: "task",
   },
   {
     id: "t22",
@@ -175,5 +195,6 @@ export const myTasks: GanttTask[] = [
     end: new Date(2025, 7, 15),
     progress: 0,
     dependencies: ["t21"],
+    type: "task",
   },
 ];
