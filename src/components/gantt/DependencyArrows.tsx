@@ -11,57 +11,139 @@ interface DependencyArrowsProps {
     tasks: Task[];
     taskPositions: Record<string, TaskPosition>;
     taskHeight: number;
+    rtl?: boolean;
 }
 
-const ARROW_HORIZONTAL_OFFSET = 10; // Offset for horizontal segments
-// const ARROW_VERTICAL_OFFSET = 12;   // Removed: Not used in the new path logic
+const ARROW_HORIZONTAL_OFFSET = 25; // Offset for horizontal segments
+const ARROW_VERTICAL_OFFSET = 12;   // Vertical offset for the main horizontal line from task row edges
 const ARROW_HEAD_SIZE = 5;
 const ARROW_HEAD_ID = "ganttArrowHeadS"; // Unique ID
+const DEFAULT_STROKE_WIDTH = "1.5";
+const DEFAULT_STROKE_COLOR = "#A0A0A0"; // Lighter grey for default segments
 
 const DependencyArrows: React.FC<DependencyArrowsProps> = ({
     tasks,
     taskPositions,
     taskHeight,
+    rtl = false,
 }) => {
     const arrowPaths: React.ReactNode[] = [];
 
-    tasks.forEach((task) => {
-        if (task.dependencies && task.dependencies.length > 0) {
-            const dependentPos = taskPositions[task.id];
-            if (!dependentPos) return;
+    // Pre-calculate successor counts for each task
+    // A task's "successor count" is the number of other tasks that depend on it.
+    const successorCounts: Record<string, number> = {};
+    tasks.forEach(currentTask => { // Iterate through all tasks to find their dependencies
+        if (currentTask.dependencies) {
+            currentTask.dependencies.forEach(predecessorId => {
+                // If currentTask depends on predecessorId, then predecessorId has currentTask as a successor.
+                successorCounts[predecessorId] = (successorCounts[predecessorId] || 0) + 1;
+            });
+        }
+    });
 
-            task.dependencies.forEach((depId) => {
-                const dependencyPos = taskPositions[depId];
-                if (!dependencyPos) return;
+    tasks.forEach((task) => { // task is the successor task
+        const deps = task.dependencies;
+        if (deps && deps.length > 0) {
+            const successorPos = taskPositions[task.id];
+            if (!successorPos) return;
 
-                const startX = dependencyPos.x + dependencyPos.width;
-                const startY = dependencyPos.y + taskHeight / 2;
-                const endX = dependentPos.x;
-                const endY = dependentPos.y + taskHeight / 2;
+            deps.forEach((predecessorId) => {
+                const predecessorPos = taskPositions[predecessorId];
+                if (!predecessorPos) return;
 
-                const intermediateY = (startY + endY) / 2;
+                // const predecessorTask = tasks.find(t => t.id === predecessorId); // Not strictly needed if we use successorCounts
+                // if (!predecessorTask) return;
 
-                // Path based on the user's diagram:
-                // Start -> Right -> Vertical -> Left -> Vertical -> Right into End
-                const points = [
-                    `${startX},${startY}`,                         // 1. Start
-                    `${startX + ARROW_HORIZONTAL_OFFSET},${startY}`, // 2. Move Right
-                    `${startX + ARROW_HORIZONTAL_OFFSET},${intermediateY}`, // 3. Move Vertical down/up to midpoint Y
-                    `${endX - ARROW_HORIZONTAL_OFFSET},${intermediateY}`,   // 4. Move Horizontal left across midpoint Y
-                    `${endX - ARROW_HORIZONTAL_OFFSET},${endY}`,      // 5. Move Vertical down/up to target Y
-                    `${endX},${endY}`,                         // 6. Move Right into Target
-                ].join(' ');
+                const startY = predecessorPos.y + taskHeight / 2;
+                const endY = successorPos.y + taskHeight / 2;
 
-                arrowPaths.push(
-                    <polyline
-                        key={`${depId}-${task.id}`}
-                        points={points}
+                let horizontalConnectingLineY: number;
+                if (successorPos.y === predecessorPos.y) {
+                    horizontalConnectingLineY = startY;
+                } else if (successorPos.y > predecessorPos.y) {
+                    horizontalConnectingLineY = predecessorPos.y + taskHeight + ARROW_VERTICAL_OFFSET;
+                } else {
+                    horizontalConnectingLineY = predecessorPos.y - ARROW_VERTICAL_OFFSET;
+                }
+
+                let x1: number, x2: number, x4: number, x6: number;
+
+                if (rtl) {
+                    const predecessorX = predecessorPos.x;
+                    const successorX = successorPos.x + successorPos.width;
+                    x1 = predecessorX;
+                    x2 = predecessorX - ARROW_HORIZONTAL_OFFSET;
+                    x4 = successorX + ARROW_HORIZONTAL_OFFSET;
+                    x6 = successorX;
+                } else { // LTR
+                    const predecessorX = predecessorPos.x + predecessorPos.width;
+                    const successorX = successorPos.x;
+                    x1 = predecessorX;
+                    x2 = predecessorX + ARROW_HORIZONTAL_OFFSET;
+                    x4 = successorX - ARROW_HORIZONTAL_OFFSET;
+                    x6 = successorX;
+                }
+
+                const pathSegments: React.ReactNode[] = [];
+                // const commonStrokeColor = "#8A8A8A"; // Replaced by conditional colors
+
+                // Segment 1: Initial horizontal from predecessor
+                pathSegments.push(
+                    <path
+                        key={`${predecessorId}-${task.id}-s1`}
+                        d={`M ${x1},${startY} H ${x2}`}
                         fill="none"
-                        stroke="#8A8A8A" // Gray color
-                        strokeWidth="1.5"
+                        stroke={DEFAULT_STROKE_COLOR}
+                        strokeWidth={DEFAULT_STROKE_WIDTH}
+                    />
+                );
+
+                // Segment 2: First vertical (from predecessor)
+                pathSegments.push(
+                    <path
+                        key={`${predecessorId}-${task.id}-v1`}
+                        d={`M ${x2},${startY} V ${horizontalConnectingLineY}`}
+                        fill="none"
+                        stroke={DEFAULT_STROKE_COLOR}
+                        strokeWidth={DEFAULT_STROKE_WIDTH}
+                    />
+                );
+
+                // Segment 3: Main horizontal
+                pathSegments.push(
+                    <path
+                        key={`${predecessorId}-${task.id}-s2`}
+                        d={`M ${x2},${horizontalConnectingLineY} H ${x4}`}
+                        fill="none"
+                        stroke={DEFAULT_STROKE_COLOR}
+                        strokeWidth={DEFAULT_STROKE_WIDTH}
+                    />
+                );
+
+                // Segment 4: Second vertical (to successor)
+                pathSegments.push(
+                    <path
+                        key={`${predecessorId}-${task.id}-v2`}
+                        d={`M ${x4},${horizontalConnectingLineY} V ${endY}`}
+                        fill="none"
+                        stroke={DEFAULT_STROKE_COLOR}
+                        strokeWidth={DEFAULT_STROKE_WIDTH}
+                    />
+                );
+
+                // Segment 5: Final horizontal to successor (with arrowhead)
+                pathSegments.push(
+                    <path
+                        key={`${predecessorId}-${task.id}-s3-arrow`}
+                        d={`M ${x4},${endY} H ${x6}`}
+                        fill="none"
+                        stroke={DEFAULT_STROKE_COLOR} // Arrow segment usually matches default
+                        strokeWidth={DEFAULT_STROKE_WIDTH}
                         markerEnd={`url(#${ARROW_HEAD_ID})`}
                     />
                 );
+
+                arrowPaths.push(...pathSegments);
             });
         }
     });
@@ -80,13 +162,13 @@ const DependencyArrows: React.FC<DependencyArrowsProps> = ({
                 <marker
                     id={ARROW_HEAD_ID}
                     viewBox="0 -5 10 10"
-                    refX="5" // Center marker tip
+                    refX="10" // Tip of the arrow (at x=10 in viewBox) to be at the line end
                     refY="0"
                     markerWidth={ARROW_HEAD_SIZE}
                     markerHeight={ARROW_HEAD_SIZE}
-                    orient="auto-start-reverse"
+                    orient="auto" // Orient along the path direction
                 >
-                    <path d="M0,-5L10,0L0,5" fill="#8A8A8A" />
+                    <path d="M0,-5L10,0L0,5" fill={DEFAULT_STROKE_COLOR} /> {/* Arrowhead color matches default lines */}
                 </marker>
             </defs>
             <g>{arrowPaths}</g>
