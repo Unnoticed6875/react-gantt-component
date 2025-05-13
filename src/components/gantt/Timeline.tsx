@@ -1,119 +1,166 @@
 "use client";
 
-import * as React from "react";
-import { Task, ViewMode } from "./types";
+import React from 'react';
+import { Task, ViewMode } from './types';
 import { TaskBar } from "./TaskBar";
-import { differenceInDays, differenceInCalendarWeeks, differenceInCalendarMonths, differenceInCalendarYears } from 'date-fns';
+import {
+    differenceInCalendarDays,
+    addDays,
+    eachDayOfInterval,
+    eachWeekOfInterval,
+    eachMonthOfInterval,
+    eachQuarterOfInterval,
+    eachYearOfInterval,
+    startOfWeek,
+    startOfMonth,
+    startOfQuarter,
+    startOfYear,
+    max,
+    min,
+} from 'date-fns';
+import DependencyArrows from './DependencyArrows';
 
 interface TimelineProps {
+    viewMode: ViewMode;
     tasks: Task[];
     startDate: Date;
     endDate: Date;
-    columnWidth: number;
-    viewMode: ViewMode;
     rowHeight: number;
+    taskHeight: number;
+    scale: number;
+    getTaskDate: (task: Task) => { start: Date; end: Date };
     getTaskBarStyle: (task: Task, index: number, calculatedStyle: React.CSSProperties) => React.CSSProperties;
     showGrid?: boolean;
-
 }
 
+interface TaskPosition {
+    x: number;
+    y: number;
+    width: number;
+}
 
 const Timeline: React.FC<TimelineProps> = ({
-    tasks,
-    startDate,
-    endDate,
-    columnWidth,
     viewMode,
+    tasks,
+    startDate: ganttStartDate,
+    endDate: ganttEndDate,
     rowHeight,
+    taskHeight,
+    scale,
+    getTaskDate,
     getTaskBarStyle,
     showGrid = true,
 }) => {
-    let numberOfColumns;
-    let getPosition;
-    let getTaskWidth;
+    const totalTimelineDays = differenceInCalendarDays(ganttEndDate, ganttStartDate) + 1;
+    const preciseTimelineWidth = totalTimelineDays * scale;
 
-    switch (viewMode) {
-        case 'day':
-            numberOfColumns = differenceInDays(endDate, startDate) + 1;
-            getPosition = (taskStart: Date) => differenceInDays(taskStart, startDate) * columnWidth;
-            getTaskWidth = (taskStart: Date, taskEnd: Date) => (differenceInDays(taskEnd, taskStart) + 1) * columnWidth;
-            break;
-        case 'week':
-            numberOfColumns = differenceInCalendarWeeks(endDate, startDate, { weekStartsOn: 1 }) + 1;
-            getPosition = (taskStart: Date) => differenceInCalendarWeeks(taskStart, startDate, { weekStartsOn: 1 }) * columnWidth;
-            getTaskWidth = (taskStart: Date, taskEnd: Date) => (differenceInCalendarWeeks(taskEnd, taskStart, { weekStartsOn: 1 }) + 1) * columnWidth;
-            break;
-        case 'month':
-            numberOfColumns = differenceInCalendarMonths(endDate, startDate) + 1;
-            getPosition = (taskStart: Date) => differenceInCalendarMonths(taskStart, startDate) * columnWidth;
-            getTaskWidth = (taskStart: Date, taskEnd: Date) => (differenceInCalendarMonths(taskEnd, taskStart) + 1) * columnWidth;
-            break;
-        case 'year':
-            numberOfColumns = differenceInCalendarYears(endDate, startDate) + 1;
-            getPosition = (taskStart: Date) => differenceInCalendarYears(taskStart, startDate) * columnWidth;
-            getTaskWidth = (taskStart: Date, taskEnd: Date) => (differenceInCalendarYears(taskEnd, taskStart) + 1) * columnWidth;
-            break;
-        default:
-            numberOfColumns = 0;
-            getPosition = () => 0;
-            getTaskWidth = () => 0;
-    }
+    const taskPositions: Record<string, TaskPosition> = {};
 
-    const totalWidth = numberOfColumns * columnWidth;
+    const renderVerticalGridLines = () => {
+        if (!showGrid) return null;
+        const lines: React.JSX.Element[] = [];
+
+        if (scale >= 3) {
+            const days = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
+            days.forEach((day, index) => {
+                lines.push(
+                    <div
+                        key={`fine-grid-col-${index}`}
+                        className="absolute top-0 bottom-0 border-r border-gray-200 dark:border-gray-700 opacity-50"
+                        style={{ left: index * scale, width: scale }}
+                    />
+                );
+            });
+        }
+
+        let majorIntervals: Date[] = [];
+        if (viewMode === 'day' && scale < 3) {
+            majorIntervals = eachDayOfInterval({ start: ganttStartDate, end: ganttEndDate });
+        } else if (viewMode === 'week') {
+            majorIntervals = eachWeekOfInterval({ start: ganttStartDate, end: ganttEndDate }, { weekStartsOn: 1 }).map(d => startOfWeek(d, { weekStartsOn: 1 }));
+        } else if (viewMode === 'month') {
+            majorIntervals = eachMonthOfInterval({ start: ganttStartDate, end: ganttEndDate }).map(d => startOfMonth(d));
+        } else if (viewMode === 'quarter') {
+            majorIntervals = eachQuarterOfInterval({ start: ganttStartDate, end: ganttEndDate }).map(d => startOfQuarter(d));
+        } else if (viewMode === 'year') {
+            majorIntervals = eachYearOfInterval({ start: ganttStartDate, end: ganttEndDate }).map(d => startOfYear(d));
+        }
+
+        majorIntervals.forEach((intervalStart, index) => {
+            const offsetDays = differenceInCalendarDays(intervalStart, ganttStartDate);
+            if (offsetDays < 0) return;
+
+            const position = offsetDays * scale;
+            if (position < preciseTimelineWidth) {
+                lines.push(
+                    <div
+                        key={`major-grid-col-${viewMode}-${index}`}
+                        className="absolute top-0 bottom-0 border-r border-gray-300 dark:border-gray-500"
+                        style={{ left: position, width: 0 }}
+                    />
+                );
+            }
+        });
+        return lines;
+    };
 
     return (
         <div className="flex flex-col h-full w-full">
+            <div className="relative" style={{ width: `${preciseTimelineWidth}px`, height: `${tasks.length * rowHeight}px` }}>
+                {renderVerticalGridLines()}
 
-            <div className="relative" style={{ width: `${totalWidth}px`, height: `${tasks.length * rowHeight}px` }}>
-                {/* Grid Lines (Vertical) */}
-                {showGrid && Array.from({ length: numberOfColumns }).map((_, index) => (
-                    <div
-                        key={`vline-${index}`}
-                        className="absolute top-0 bottom-0 border-r border-dashed border-gray-500 z-10"
-                        style={{ left: `${index * columnWidth}px`, width: `${columnWidth}px` }}
-                    />
-                ))}
-                {/* Horizontal Grid Lines (per task row) */}
                 {showGrid && tasks.map((_, index) => (
                     <div
-                        key={`hline-${index}`}
-                        className="absolute left-0 right-0 border-b border-dashed border-gray-500 z-10"
-                        style={{ top: `${(index + 1) * rowHeight}px`, height: `0px` }}
+                        key={`grid-row-${index}`}
+                        className="absolute left-0 right-0 border-b border-gray-200 dark:border-gray-600"
+                        style={{ top: (index + 1) * rowHeight - 1, height: 1, zIndex: 0 }}
                     />
                 ))}
 
-                {/* Task Bars */}
                 {tasks.map((task, index) => {
-                    const taskStart = task.start;
-                    const taskEnd = task.end;
+                    const { start: taskStart, end: taskEnd } = getTaskDate(task);
 
-                    if (!taskStart || !taskEnd || taskStart > endDate || taskEnd < startDate) {
-                        return null;
-                    }
+                    const effectiveTaskStart = max([taskStart, ganttStartDate]);
+                    const effectiveTaskEnd = min([taskEnd, ganttEndDate]);
 
-                    const left = getPosition(taskStart < startDate ? startDate : taskStart);
-                    const effectiveTaskEnd = taskEnd > endDate ? endDate : taskEnd;
-                    const effectiveTaskStart = taskStart < startDate ? startDate : taskStart;
-                    let width = getTaskWidth(effectiveTaskStart, effectiveTaskEnd);
+                    if (effectiveTaskStart > effectiveTaskEnd) return null;
 
-                    if (width < 0) width = 0; // Ensure width is not negative
+                    const taskStartOffsetDays = differenceInCalendarDays(effectiveTaskStart, ganttStartDate);
+                    const taskDurationDays = differenceInCalendarDays(addDays(effectiveTaskEnd, 1), effectiveTaskStart);
 
-                    const taskSpecificStyles: React.CSSProperties = {
-                        left: `${left}px`,
-                        width: `${width}px`,
-                        // height: '80%', // Consider making this configurable or based on rowHeight
-                        // top: `${index * rowHeight + (rowHeight * 0.1)}px`, // Centered within the row
-                        position: 'absolute'
+                    if (taskDurationDays <= 0) return null;
+
+                    const x = taskStartOffsetDays * scale;
+                    const y = index * rowHeight + (rowHeight - taskHeight) / 2;
+                    const width = Math.max(0, taskDurationDays * scale - 1);
+
+                    taskPositions[task.id] = { x, y, width };
+
+                    const baseStyle: React.CSSProperties = {
+                        position: 'absolute',
+                        left: x,
+                        top: y,
+                        width: width,
+                        height: taskHeight,
+                        zIndex: 1,
                     };
+
+                    const finalStyle = getTaskBarStyle(task, index, baseStyle);
 
                     return (
                         <TaskBar
                             key={task.id}
                             task={task}
-                            taskBarStyle={getTaskBarStyle(task, index, taskSpecificStyles)}
+                            taskBarStyle={finalStyle}
                         />
                     );
                 })}
+
+                <DependencyArrows
+                    tasks={tasks}
+                    taskPositions={taskPositions}
+                    taskHeight={taskHeight}
+                />
             </div>
         </div>
     );
