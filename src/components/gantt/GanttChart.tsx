@@ -96,7 +96,8 @@ const GanttChart: React.FC<GanttChartProps> = ({
             <ResizableHandle withHandle className="bg-gray-200 dark:bg-gray-700" />
             {/* Timeline Panel */}
             <ResizablePanel defaultSize={75} minSize={30}>
-                <div className="flex flex-col h-full overflow-hidden">
+                {/* <div className="flex flex-col h-full overflow-hidden"> */}
+                <ScrollArea className="flex-1" onScroll={handleScroll}>
                     <TimelineHeader
                         viewMode={viewMode}
                         startDate={ganttStartDate}
@@ -104,21 +105,21 @@ const GanttChart: React.FC<GanttChartProps> = ({
                         scale={scale}
                         scrollLeft={scrollLeft}
                     />
-                    <ScrollArea className="flex-1" onScroll={handleScroll}>
-                        <Timeline
-                            tasks={tasks}
-                            startDate={ganttStartDate}
-                            endDate={ganttEndDate}
-                            rowHeight={rowHeight}
-                            taskHeight={taskHeight}
-                            scale={scale}
-                            getTaskDate={getTaskDate}
-                            getTaskBarStyle={getTaskBarStyle}
-                            showGrid={true}
-                        />
-                        <ScrollBar orientation="horizontal" />
-                    </ScrollArea>
-                </div>
+
+                    <Timeline
+                        tasks={tasks}
+                        startDate={ganttStartDate}
+                        endDate={ganttEndDate}
+                        rowHeight={rowHeight}
+                        taskHeight={taskHeight}
+                        scale={scale}
+                        getTaskDate={getTaskDate}
+                        getTaskBarStyle={getTaskBarStyle}
+                        showGrid={true}
+                    />
+                    <ScrollBar orientation="horizontal" />
+                </ScrollArea>
+                {/* </div> */}
             </ResizablePanel>
         </ResizablePanelGroup>
     );
