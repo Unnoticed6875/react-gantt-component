@@ -14,6 +14,7 @@ import {
     type UniqueIdentifier,
     type DragMoveEvent
 } from '@dnd-kit/core';
+import { restrictToHorizontalAxis } from '@dnd-kit/modifiers';
 // import { CSS } from '@dnd-kit/utilities'; // Removed, unused for now
 // import { sortableKeyboardCoordinates } from '@dnd-kit/sortable'; // Removed, not used yet
 
@@ -289,6 +290,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
             onDragStart={handleDragStart}
             onDragMove={handleDragMove}
             onDragEnd={handleDragEnd}
+            modifiers={[restrictToHorizontalAxis]}
         >
             <div className="flex flex-col h-full w-full">
                 <div className="p-2 flex gap-2 bg-gray-100 dark:bg-gray-800 border-b">
