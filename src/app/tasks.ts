@@ -17,6 +17,7 @@ export const myTasks: Task[] = [
     progress: 75,
     dependencies: ["t1"],
     type: "task",
+    parentId: "t1",
   },
   {
     id: "t3",
@@ -106,6 +107,7 @@ export const myTasks: Task[] = [
     progress: 50,
     dependencies: ["t1"],
     type: "task",
+    parentId: "t1",
   },
   {
     id: "t13",
@@ -124,6 +126,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t13"],
     type: "task",
+    parentId: "t13",
   },
   {
     id: "t15",
@@ -133,6 +136,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t14"],
     type: "task",
+    parentId: "t13",
   },
   {
     id: "t16",

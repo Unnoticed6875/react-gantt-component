@@ -3,12 +3,14 @@
 export interface Task {
   id: string;
   name: string;
+  type: "task" | "milestone";
   start: Date;
   end: Date;
-  progress: number;
+  progress: number; // 0-100
   dependencies?: string[]; // IDs of tasks this task depends on
-  milestone?: boolean;
-  type: "task" | "milestone";
+  parentId?: string; // ID of the parent task
+  backgroundColor?: string;
+  // milestone?: boolean; // This seems redundant if 'type' includes 'milestone'
 }
 
 export interface GanttLink {

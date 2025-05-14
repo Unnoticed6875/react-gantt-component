@@ -26,6 +26,7 @@ import Timeline from './Timeline';
 import TimelineHeader from './TimelineHeader';
 import { TaskBar } from './TaskBar';
 import { addDays, startOfDay, endOfDay, min, max, differenceInCalendarDays } from 'date-fns';
+import { getHierarchicalTasks, getVisibleTasks } from './utils'; // Import the new utility function
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
 
@@ -34,6 +35,7 @@ interface GanttChartProps {
     rowHeight?: number;
     defaultViewMode?: ViewMode;
     onTasksUpdate?: (updatedTasks: Task[]) => void;
+    initialTasksOpen?: boolean; // New prop
 }
 
 // Default values
@@ -73,10 +75,40 @@ const GanttChart: React.FC<GanttChartProps> = ({
     rowHeight = DEFAULT_ROW_HEIGHT,
     defaultViewMode = DEFAULT_VIEW_MODE,
     onTasksUpdate,
+    initialTasksOpen = true, // Default to true
 }) => {
     const [currentViewMode, setCurrentViewMode] = useState<ViewMode>(defaultViewMode);
     const [currentScale, setCurrentScale] = useState<number>(VIEW_MODE_SCALES[defaultViewMode]);
     const timelineContainerRef = useRef<HTMLDivElement>(null);
+
+    // Process tasks for hierarchical display
+    const hierarchicalTasks = useMemo(() => getHierarchicalTasks(tasks), [tasks]);
+    console.log("GanttChart - hierarchicalTasks (IDs and parentIDs):", JSON.stringify(hierarchicalTasks.map(t => ({ id: t.id, p: t.parentId }))));
+
+    // State for expanded tasks
+    const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>(() => {
+        const initialState: Record<string, boolean> = {};
+        // Initialize based on tasks that are parents
+        tasks.forEach(task => {
+            if (tasks.some(child => child.parentId === task.id)) {
+                initialState[task.id] = initialTasksOpen;
+            }
+        });
+        return initialState;
+    });
+
+    const handleToggleTaskExpansion = (taskId: string) => {
+        setExpandedTaskIds(prev => ({
+            ...prev,
+            [taskId]: !prev[taskId],
+        }));
+    };
+
+    const visibleTimelineTasks = useMemo(() => {
+        return getVisibleTasks(tasks, expandedTaskIds, hierarchicalTasks);
+    }, [tasks, expandedTaskIds, hierarchicalTasks]);
+
+    // console.log("GanttChart - visibleTimelineTasks:", JSON.stringify(visibleTimelineTasks.map(t => ({ id: t.id, p: t.parentId }))));
 
     // State for dnd-kit
     const [activeDragId, setActiveDragId] = useState<UniqueIdentifier | null>(null);
@@ -94,20 +126,20 @@ const GanttChart: React.FC<GanttChartProps> = ({
 
     // Calculate overall date range based on tasks
     const { ganttStartDate, ganttEndDate } = useMemo(() => {
-        if (!tasks || tasks.length === 0) {
+        if (!hierarchicalTasks || hierarchicalTasks.length === 0) { // Use hierarchicalTasks
             const today = startOfDay(new Date());
             return {
                 ganttStartDate: today,
-                ganttEndDate: endOfDay(addDays(today, 30)), // Default 30-day range if no tasks
+                ganttEndDate: endOfDay(addDays(today, 30)),
             };
         }
-        const taskStarts = tasks.map(t => t.start);
-        const taskEnds = tasks.map(t => t.end);
+        const taskStarts = hierarchicalTasks.map(t => t.start); // Use hierarchicalTasks
+        const taskEnds = hierarchicalTasks.map(t => t.end); // Use hierarchicalTasks
         return {
             ganttStartDate: startOfDay(min(taskStarts)),
             ganttEndDate: endOfDay(max(taskEnds)),
         };
-    }, [tasks]);
+    }, [hierarchicalTasks]); // Dependency is now hierarchicalTasks
 
     // Define heights
     const taskHeight = DEFAULT_TASK_HEIGHT;
@@ -311,7 +343,13 @@ const GanttChart: React.FC<GanttChartProps> = ({
                         <div className="flex flex-col h-full">
                             <TaskListHeader ganttHeaderHeight={DEFAULT_GANTT_HEADER_HEIGHT} />
                             <ScrollArea className="flex-1">
-                                <TaskList tasks={tasks} rowHeight={rowHeight} />
+                                <TaskList
+                                    tasks={hierarchicalTasks}
+                                    rowHeight={rowHeight}
+                                    onTaskRowClick={(task) => console.log("Task clicked:", task.name)}
+                                    expandedTaskIds={expandedTaskIds}
+                                    onToggleExpansion={handleToggleTaskExpansion}
+                                />
                             </ScrollArea>
                         </div>
                     </ResizablePanel>
@@ -330,7 +368,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
 
                                 <Timeline
                                     viewMode={currentViewMode}
-                                    tasks={tasks}
+                                    tasks={visibleTimelineTasks}
                                     startDate={ganttStartDate}
                                     endDate={ganttEndDate}
                                     rowHeight={rowHeight}
