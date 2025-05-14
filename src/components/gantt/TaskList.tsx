@@ -1,13 +1,13 @@
 "use client";
 
 import * as React from "react";
-import { GanttTask } from "./types";
+import { Task } from "./types";
 
 interface TaskListProps {
-    tasks: GanttTask[];
+    tasks: Task[];
     rowHeight: number;
 
-    onTaskRowClick?: (task: GanttTask) => void; // Optional: for future interactions
+    onTaskRowClick?: (task: Task) => void; // Optional: for future interactions
     // TODO: Add other necessary props like selectedTaskId, etc.
 }
 
@@ -26,8 +26,8 @@ export function TaskList({
                     style={{ height: `${rowHeight}px` }}
                     onClick={() => onTaskRowClick?.(task)}
                 >
-                    <div className="w-1/2 truncate pl-4 pr-2">{task.id}</div>
-                    <div className="w-1/2 truncate pl-4 pr-2">{task.name}</div>
+                    <div className="w-1/2 text-xs truncate pl-4 pr-2">{task.id}</div>
+                    <div className="w-1/2 text-xs truncate pl-4 pr-2">{task.name}</div>
                     <div className="w-1/4 text-xs text-center">{task.start.toLocaleDateString()}</div>
                     <div className="w-1/4 text-xs text-center pr-4">{task.end.toLocaleDateString()}</div>
                     <div className="w-1/4 text-xs text-center pr-4">{task.dependencies?.join(", ")}</div>

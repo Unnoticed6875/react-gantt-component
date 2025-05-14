@@ -15,6 +15,7 @@ interface GanttChartProps {
     tasks: Task[];
     rowHeight?: number;
     defaultViewMode?: ViewMode;
+    onTasksUpdate?: (updatedTasks: Task[]) => void;
 }
 
 // Default values
@@ -38,6 +39,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
     tasks,
     rowHeight = DEFAULT_ROW_HEIGHT,
     defaultViewMode = DEFAULT_VIEW_MODE,
+    onTasksUpdate,
 }) => {
     const [currentViewMode, setCurrentViewMode] = useState<ViewMode>(defaultViewMode);
     const [currentScale, setCurrentScale] = useState<number>(VIEW_MODE_SCALES[defaultViewMode]);
@@ -94,6 +96,24 @@ const GanttChart: React.FC<GanttChartProps> = ({
             cursor: 'pointer',
         };
     }, []); // Add dependencies if any custom logic relies on component state or props
+
+    const handleTaskUpdate = (taskId: string, newStart: Date, newEnd: Date) => {
+        if (onTasksUpdate) {
+            const updatedTasks = tasks.map(task =>
+                task.id === taskId ? { ...task, start: newStart, end: newEnd } : task
+            );
+            onTasksUpdate(updatedTasks);
+        }
+        // If you want GanttChart to manage its own state copy:
+        // else {
+        //     // This requires GanttChart to have its own state for tasks, e.g.,
+        //     // const [internalTasks, setInternalTasks] = useState(tasks);
+        //     // And then use internalTasks throughout the component and update it here.
+        //     // This might be useful if the parent doesn't need to know about every update or
+        //     // if GanttChart is a more self-contained component.
+        //     console.warn("GanttChart: onTasksUpdate not provided. Task update is not persisted.");
+        // }
+    };
 
     // State for synchronizing horizontal scroll between TimelineHeader and Timeline body
     const [scrollLeft, setScrollLeft] = useState(0);
@@ -174,6 +194,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
                                 getTaskDate={getTaskDate}
                                 getTaskBarStyle={getTaskBarStyle}
                                 showGrid={true}
+                                onTaskUpdate={handleTaskUpdate}
                             />
                             <ScrollBar orientation="horizontal" />
                         </ScrollArea>
