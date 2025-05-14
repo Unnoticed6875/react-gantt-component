@@ -29,6 +29,7 @@ import { addDays, startOfDay, endOfDay, min, max, differenceInCalendarDays } fro
 import { getHierarchicalTasks, getVisibleTasks } from './utils'; // Import the new utility function
 import { ScrollArea, ScrollBar } from "@/components/ui/scroll-area";
 import { Button } from "@/components/ui/button";
+import { TooltipProvider } from "@/components/ui/tooltip";
 
 interface GanttChartProps {
     tasks: Task[];
@@ -324,93 +325,95 @@ const GanttChart: React.FC<GanttChartProps> = ({
             onDragEnd={handleDragEnd}
             modifiers={[restrictToHorizontalAxis]}
         >
-            <div className="flex flex-col h-full w-full">
-                <div className="p-2 flex gap-2 bg-gray-100 dark:bg-gray-800 border-b">
-                    {(Object.keys(VIEW_MODE_SCALES) as ViewMode[]).map(vm => (
-                        <Button
-                            key={vm}
-                            onClick={() => setCurrentViewMode(vm)}
-                            variant={currentViewMode === vm ? "default" : "outline"}
-                            size="sm"
-                        >
-                            {vm.charAt(0).toUpperCase() + vm.slice(1)}
-                        </Button>
-                    ))}
-                </div>
-                <ResizablePanelGroup direction="horizontal" className="flex-1 w-full border rounded-lg bg-white dark:bg-gray-900 shadow-sm">
-                    {/* Task List Panel */}
-                    <ResizablePanel defaultSize={25} minSize={20} className="bg-gray-50 dark:bg-gray-800">
-                        <div className="flex flex-col h-full">
-                            <TaskListHeader ganttHeaderHeight={DEFAULT_GANTT_HEADER_HEIGHT} />
-                            <ScrollArea className="flex-1">
-                                <TaskList
-                                    tasks={hierarchicalTasks}
-                                    rowHeight={rowHeight}
-                                    onTaskRowClick={(task) => console.log("Task clicked:", task.name)}
-                                    expandedTaskIds={expandedTaskIds}
-                                    onToggleExpansion={handleToggleTaskExpansion}
-                                />
-                            </ScrollArea>
-                        </div>
-                    </ResizablePanel>
-                    <ResizableHandle withHandle className="bg-gray-200 dark:bg-gray-700" />
-                    {/* Timeline Panel */}
-                    <ResizablePanel defaultSize={75} minSize={30}>
-                        <div ref={timelineContainerRef} className="flex flex-col h-full overflow-hidden">
-                            <ScrollArea className="flex-1" onScroll={handleScroll}>
-                                <TimelineHeader
-                                    viewMode={currentViewMode}
-                                    startDate={ganttStartDate}
-                                    endDate={ganttEndDate}
-                                    scale={currentScale}
-                                    scrollLeft={scrollLeft}
-                                />
+            <TooltipProvider>
+                <div className="flex flex-col h-full w-full">
+                    <div className="p-2 flex gap-2 bg-gray-100 dark:bg-gray-800 border-b">
+                        {(Object.keys(VIEW_MODE_SCALES) as ViewMode[]).map(vm => (
+                            <Button
+                                key={vm}
+                                onClick={() => setCurrentViewMode(vm)}
+                                variant={currentViewMode === vm ? "default" : "outline"}
+                                size="sm"
+                            >
+                                {vm.charAt(0).toUpperCase() + vm.slice(1)}
+                            </Button>
+                        ))}
+                    </div>
+                    <ResizablePanelGroup direction="horizontal" className="flex-1 w-full border rounded-lg bg-white dark:bg-gray-900 shadow-sm">
+                        {/* Task List Panel */}
+                        <ResizablePanel defaultSize={25} minSize={20} className="bg-gray-50 dark:bg-gray-800">
+                            <div className="flex flex-col h-full">
+                                <TaskListHeader ganttHeaderHeight={DEFAULT_GANTT_HEADER_HEIGHT} />
+                                <ScrollArea className="flex-1">
+                                    <TaskList
+                                        tasks={hierarchicalTasks}
+                                        rowHeight={rowHeight}
+                                        onTaskRowClick={(task) => console.log("Task clicked:", task.name)}
+                                        expandedTaskIds={expandedTaskIds}
+                                        onToggleExpansion={handleToggleTaskExpansion}
+                                    />
+                                </ScrollArea>
+                            </div>
+                        </ResizablePanel>
+                        <ResizableHandle withHandle className="bg-gray-200 dark:bg-gray-700" />
+                        {/* Timeline Panel */}
+                        <ResizablePanel defaultSize={75} minSize={30}>
+                            <div ref={timelineContainerRef} className="flex flex-col h-full overflow-hidden">
+                                <ScrollArea className="flex-1" onScroll={handleScroll}>
+                                    <TimelineHeader
+                                        viewMode={currentViewMode}
+                                        startDate={ganttStartDate}
+                                        endDate={ganttEndDate}
+                                        scale={currentScale}
+                                        scrollLeft={scrollLeft}
+                                    />
 
-                                <Timeline
-                                    viewMode={currentViewMode}
-                                    tasks={visibleTimelineTasks}
-                                    startDate={ganttStartDate}
-                                    endDate={ganttEndDate}
-                                    rowHeight={rowHeight}
-                                    taskHeight={taskHeight}
-                                    scale={currentScale}
-                                    getTaskDate={getTaskDate}
-                                    getTaskBarStyle={getTaskBarStyle}
-                                    showGrid={true}
-                                />
-                                <ScrollBar orientation="horizontal" />
-                            </ScrollArea>
-                        </div>
-                    </ResizablePanel>
-                </ResizablePanelGroup>
-            </div>
-            <DragOverlay dropAnimation={null}>
-                {activeDragId && draggedTaskForOverlay && activeDragData ? (
-                    activeDragData.type === 'task-body' ? (
-                        <TaskBar
-                            task={draggedTaskForOverlay}
-                            taskBarStyle={{
-                                height: taskHeight,
-                                width: (differenceInCalendarDays(draggedTaskForOverlay.end, draggedTaskForOverlay.start) + 1) * currentScale - 1,
-                                backgroundColor: draggedTaskForOverlay.type === 'milestone' ? '#a855f7' : '#3b82f6',
-                                opacity: 0.75,
-                                boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
-                                borderRadius: '4px',
-                                color: 'white',
-                                fontSize: '0.8rem',
-                                paddingLeft: '8px',
-                                display: 'flex',
-                                alignItems: 'center',
-                            }}
-                            isOverlay={true}
-                        />
-                    ) : (
-                        // For resize handles, render nothing or a minimal line/handle indicator
-                        // For now, rendering null is simplest.
-                        null
-                    )
-                ) : null}
-            </DragOverlay>
+                                    <Timeline
+                                        viewMode={currentViewMode}
+                                        tasks={visibleTimelineTasks}
+                                        startDate={ganttStartDate}
+                                        endDate={ganttEndDate}
+                                        rowHeight={rowHeight}
+                                        taskHeight={taskHeight}
+                                        scale={currentScale}
+                                        getTaskDate={getTaskDate}
+                                        getTaskBarStyle={getTaskBarStyle}
+                                        showGrid={true}
+                                    />
+                                    <ScrollBar orientation="horizontal" />
+                                </ScrollArea>
+                            </div>
+                        </ResizablePanel>
+                    </ResizablePanelGroup>
+                </div>
+                <DragOverlay dropAnimation={null}>
+                    {activeDragId && draggedTaskForOverlay && activeDragData ? (
+                        activeDragData.type === 'task-body' ? (
+                            <TaskBar
+                                task={draggedTaskForOverlay}
+                                taskBarStyle={{
+                                    height: taskHeight,
+                                    width: (differenceInCalendarDays(draggedTaskForOverlay.end, draggedTaskForOverlay.start) + 1) * currentScale - 1,
+                                    backgroundColor: draggedTaskForOverlay.type === 'milestone' ? '#a855f7' : '#3b82f6',
+                                    opacity: 0.75,
+                                    boxShadow: '0 5px 15px rgba(0,0,0,0.3)',
+                                    borderRadius: '4px',
+                                    color: 'white',
+                                    fontSize: '0.8rem',
+                                    paddingLeft: '8px',
+                                    display: 'flex',
+                                    alignItems: 'center',
+                                }}
+                                isOverlay={true}
+                            />
+                        ) : (
+                            // For resize handles, render nothing or a minimal line/handle indicator
+                            // For now, rendering null is simplest.
+                            null
+                        )
+                    ) : null}
+                </DragOverlay>
+            </TooltipProvider>
         </DndContext>
     );
 };

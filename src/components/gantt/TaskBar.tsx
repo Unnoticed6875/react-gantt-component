@@ -5,6 +5,11 @@ import { useDraggable } from '@dnd-kit/core';
 import { CSS } from '@dnd-kit/utilities'; // For applying transform
 import { Task } from "./types";
 import { Progress } from "@/components/ui/progress";
+import {
+    Tooltip,
+    TooltipContent,
+    TooltipTrigger,
+} from "@/components/ui/tooltip";
 // date-fns imports are no longer needed here for drag calculations
 
 interface TaskBarProps {
@@ -24,7 +29,6 @@ const getDraggableId = (taskId: string, type: 'body' | 'left' | 'right') => {
 };
 
 export function TaskBar({ task, taskBarStyle, onTaskBarClick, isOverlay = false }: TaskBarProps) {
-
     const {
         attributes: bodyAttributes,
         listeners: bodyListeners,
@@ -38,6 +42,7 @@ export function TaskBar({ task, taskBarStyle, onTaskBarClick, isOverlay = false 
             task: task,
             originalTaskDates: { start: task.start, end: task.end }, // Pass original dates
         },
+        disabled: isOverlay,
     });
 
     const {
@@ -113,53 +118,66 @@ export function TaskBar({ task, taskBarStyle, onTaskBarClick, isOverlay = false 
     }
 
     return (
-        <div
-            ref={setBodyNodeRef} // Apply ref for dnd-kit
-            style={liveElementStyle} // Apply combined style (base + transform + dragging opacity)
-            {...bodyListeners} // Apply listeners for drag interactions
-            {...bodyAttributes} // Apply attributes (like role, aria)
-            className="group relative bg-primary rounded overflow-hidden text-primary-foreground text-xs flex items-center cursor-grab"
-            onClick={() => !isAnyPartDragging && onTaskBarClick?.(task)}
-            title={`${task.name} (${task.progress !== undefined ? task.progress + '%' : ''})`}
-        >
-            {/* Left Resize Handle */}
-            <div
-                ref={setLeftHandleNodeRef}
-                style={{
-                    ...handleWrapperStyle,
-                    left: 0,
-                    backgroundColor: isLeftHandleDragging ? 'rgba(0,100,255,0.3)' : 'transparent'
-                }}
-                {...leftHandleListeners}
-                {...leftHandleAttributes}
-                className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-            />
-
-            <div className="relative w-full h-full px-2 flex items-center overflow-hidden">
-                <span className="truncate select-none">{task.name}</span>
-                {task.progress !== undefined && (
-                    <Progress
-                        value={task.progress}
-                        className="absolute top-0 left-0 h-full w-full !bg-primary/70 rounded-none opacity-50 group-hover:opacity-40 transition-opacity duration-150"
+        <Tooltip>
+            <TooltipTrigger asChild>
+                <div
+                    ref={setBodyNodeRef}
+                    style={liveElementStyle}
+                    {...bodyListeners}
+                    {...bodyAttributes}
+                    className="group relative bg-primary rounded overflow-hidden text-primary-foreground text-xs flex items-center cursor-grab"
+                    onClick={() => !isAnyPartDragging && onTaskBarClick?.(task)}
+                >
+                    <div
+                        ref={setLeftHandleNodeRef}
+                        style={{
+                            ...handleWrapperStyle,
+                            left: 0,
+                            backgroundColor: isLeftHandleDragging ? 'rgba(0,100,255,0.3)' : 'transparent'
+                        }}
+                        {...leftHandleListeners}
+                        {...leftHandleAttributes}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
                     />
-                )}
-                <span className="truncate relative z-10 pl-1 select-none">
-                    {task.progress !== undefined ? `(${task.progress}%)` : ''}
-                </span>
-            </div>
 
-            {/* Right Resize Handle */}
-            <div
-                ref={setRightHandleNodeRef}
-                style={{
-                    ...handleWrapperStyle,
-                    right: 0,
-                    backgroundColor: isRightHandleDragging ? 'rgba(0,100,255,0.3)' : 'transparent'
-                }}
-                {...rightHandleListeners}
-                {...rightHandleAttributes}
-                className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-            />
-        </div>
+                    <div className="relative w-full h-full px-2 flex items-center overflow-hidden">
+                        <span className="truncate select-none">{task.name}</span>
+                        {task.progress !== undefined && (
+                            <Progress
+                                value={task.progress}
+                                className="absolute top-0 left-0 h-full w-full !bg-primary/70 rounded-none opacity-50 group-hover:opacity-40 transition-opacity duration-150"
+                            />
+                        )}
+                        <span className="truncate relative z-10 pl-1 select-none">
+                            {task.progress !== undefined ? `(${task.progress}%)` : ''}
+                        </span>
+                    </div>
+
+                    <div
+                        ref={setRightHandleNodeRef}
+                        style={{
+                            ...handleWrapperStyle,
+                            right: 0,
+                            backgroundColor: isRightHandleDragging ? 'rgba(0,100,255,0.3)' : 'transparent'
+                        }}
+                        {...rightHandleListeners}
+                        {...rightHandleAttributes}
+                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+                    />
+                </div>
+            </TooltipTrigger>
+            <TooltipContent>
+                <p>
+                    <strong>{task.name}</strong>
+                </p>
+                <p>ID: {task.id}</p>
+                <p>Start: {task.start.toLocaleDateString()}</p>
+                <p>End: {task.end.toLocaleDateString()}</p>
+                {task.dependencies && task.dependencies.length > 0 && (
+                    <p>Depends on: {task.dependencies.join(", ")}</p>
+                )}
+                {task.progress !== undefined && <p>Progress: {task.progress}%</p>}
+            </TooltipContent>
+        </Tooltip>
     );
 } 
