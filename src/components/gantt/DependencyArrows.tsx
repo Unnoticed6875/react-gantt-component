@@ -21,134 +21,147 @@ const ARROW_HEAD_ID = "ganttArrowHeadS"; // Unique ID
 const DEFAULT_STROKE_WIDTH = "1.5";
 const DEFAULT_STROKE_COLOR = "#A0A0A0"; // Lighter grey for default segments
 
+interface ArrowPathParams {
+    predecessorPos: TaskPosition;
+    successorPos: TaskPosition;
+    predecessorId: string;
+    successorId: string;
+    taskHeight: number;
+    rtl: boolean;
+}
+
+function generateArrowPathSegments({
+    predecessorPos,
+    successorPos,
+    predecessorId,
+    successorId,
+    taskHeight,
+    rtl
+}: ArrowPathParams): React.ReactNode[] {
+    const startY = predecessorPos.y + taskHeight / 2;
+    const endY = successorPos.y + taskHeight / 2;
+
+    let horizontalConnectingLineY: number;
+    if (successorPos.y === predecessorPos.y) {
+        // For same-row tasks, try to route slightly differently if they are very close or overlapping
+        // This simple version keeps it on the same line, adjust if complex routing is needed.
+        horizontalConnectingLineY = startY;
+    } else if (successorPos.y > predecessorPos.y) {
+        horizontalConnectingLineY = predecessorPos.y + taskHeight + ARROW_VERTICAL_OFFSET;
+        // Ensure horizontalConnectingLineY is not too close to successorPos.y if successor is just one row below
+        if (horizontalConnectingLineY > endY - ARROW_VERTICAL_OFFSET) {
+            horizontalConnectingLineY = (startY + endY) / 2; // Midpoint if too close
+        }
+    } else { // successorPos.y < predecessorPos.y
+        horizontalConnectingLineY = predecessorPos.y - ARROW_VERTICAL_OFFSET;
+        if (horizontalConnectingLineY < endY + ARROW_VERTICAL_OFFSET) {
+            horizontalConnectingLineY = (startY + endY) / 2;
+        }
+    }
+
+    let x1: number, x2: number, x4: number, x6: number;
+
+    if (rtl) {
+        const predecessorX = predecessorPos.x;
+        const successorX = successorPos.x + successorPos.width;
+        x1 = predecessorX;
+        x2 = predecessorX - ARROW_HORIZONTAL_OFFSET;
+        x4 = successorX + ARROW_HORIZONTAL_OFFSET;
+        x6 = successorX;
+    } else { // LTR
+        const predecessorX = predecessorPos.x + predecessorPos.width;
+        const successorX = successorPos.x;
+        x1 = predecessorX;
+        x2 = predecessorX + ARROW_HORIZONTAL_OFFSET;
+        x4 = successorX - ARROW_HORIZONTAL_OFFSET;
+        x6 = successorX;
+    }
+
+    // Prevent lines from crossing back over themselves too much if tasks are very close
+    // If x2 (first turn) is beyond x4 (second turn), it means tasks are too close for normal routing.
+    // This is a simplified check. More complex scenarios might need advanced pathfinding.
+    if ((!rtl && x2 > x4) || (rtl && x2 < x4)) {
+        x2 = (x1 + x6) / 2;
+        x4 = x2;
+        // If tasks are in the same row and too close, the horizontal connecting line might be very short or negative.
+        // In this case, directly connect or use a simpler path.
+        if (successorPos.y === predecessorPos.y) {
+            horizontalConnectingLineY = startY; // Keep on same line
+        }
+    }
+
+    const pathSegments: React.ReactNode[] = [];
+
+    pathSegments.push(
+        <path
+            key={`${predecessorId}-${successorId}-s1`}
+            d={`M ${x1},${startY} H ${x2}`}
+            fill="none" stroke={DEFAULT_STROKE_COLOR} strokeWidth={DEFAULT_STROKE_WIDTH}
+        />
+    );
+    pathSegments.push(
+        <path
+            key={`${predecessorId}-${successorId}-v1`}
+            d={`M ${x2},${startY} V ${horizontalConnectingLineY}`}
+            fill="none" stroke={DEFAULT_STROKE_COLOR} strokeWidth={DEFAULT_STROKE_WIDTH}
+        />
+    );
+    pathSegments.push(
+        <path
+            key={`${predecessorId}-${successorId}-s2`}
+            d={`M ${x2},${horizontalConnectingLineY} H ${x4}`}
+            fill="none" stroke={DEFAULT_STROKE_COLOR} strokeWidth={DEFAULT_STROKE_WIDTH}
+        />
+    );
+    pathSegments.push(
+        <path
+            key={`${predecessorId}-${successorId}-v2`}
+            d={`M ${x4},${horizontalConnectingLineY} V ${endY}`}
+            fill="none" stroke={DEFAULT_STROKE_COLOR} strokeWidth={DEFAULT_STROKE_WIDTH}
+        />
+    );
+    pathSegments.push(
+        <path
+            key={`${predecessorId}-${successorId}-s3-arrow`}
+            d={`M ${x4},${endY} H ${x6}`}
+            fill="none" stroke={DEFAULT_STROKE_COLOR} strokeWidth={DEFAULT_STROKE_WIDTH}
+            markerEnd={`url(#${ARROW_HEAD_ID})`}
+        />
+    );
+    return pathSegments;
+}
+
 const DependencyArrows: React.FC<DependencyArrowsProps> = ({
     tasks,
     taskPositions,
     taskHeight,
     rtl = false,
 }) => {
-    const arrowPaths: React.ReactNode[] = [];
+    const arrowPathElements: React.ReactNode[] = [];
 
-    // Pre-calculate successor counts for each task
-    // A task's "successor count" is the number of other tasks that depend on it.
-    const successorCounts: Record<string, number> = {};
-    tasks.forEach(currentTask => { // Iterate through all tasks to find their dependencies
-        if (currentTask.dependencies) {
-            currentTask.dependencies.forEach(predecessorId => {
-                // If currentTask depends on predecessorId, then predecessorId has currentTask as a successor.
-                successorCounts[predecessorId] = (successorCounts[predecessorId] || 0) + 1;
-            });
-        }
-    });
-
-    tasks.forEach((task) => { // task is the successor task
-        const deps = task.dependencies;
+    tasks.forEach((successorTask) => {
+        const deps = successorTask.dependencies;
         if (deps && deps.length > 0) {
-            const successorPos = taskPositions[task.id];
+            const successorPos = taskPositions[successorTask.id];
             if (!successorPos) return;
 
             deps.forEach((predecessorId) => {
                 const predecessorPos = taskPositions[predecessorId];
                 if (!predecessorPos) return;
 
-                // const predecessorTask = tasks.find(t => t.id === predecessorId); // Not strictly needed if we use successorCounts
-                // if (!predecessorTask) return;
-
-                const startY = predecessorPos.y + taskHeight / 2;
-                const endY = successorPos.y + taskHeight / 2;
-
-                let horizontalConnectingLineY: number;
-                if (successorPos.y === predecessorPos.y) {
-                    horizontalConnectingLineY = startY;
-                } else if (successorPos.y > predecessorPos.y) {
-                    horizontalConnectingLineY = predecessorPos.y + taskHeight + ARROW_VERTICAL_OFFSET;
-                } else {
-                    horizontalConnectingLineY = predecessorPos.y - ARROW_VERTICAL_OFFSET;
-                }
-
-                let x1: number, x2: number, x4: number, x6: number;
-
-                if (rtl) {
-                    const predecessorX = predecessorPos.x;
-                    const successorX = successorPos.x + successorPos.width;
-                    x1 = predecessorX;
-                    x2 = predecessorX - ARROW_HORIZONTAL_OFFSET;
-                    x4 = successorX + ARROW_HORIZONTAL_OFFSET;
-                    x6 = successorX;
-                } else { // LTR
-                    const predecessorX = predecessorPos.x + predecessorPos.width;
-                    const successorX = successorPos.x;
-                    x1 = predecessorX;
-                    x2 = predecessorX + ARROW_HORIZONTAL_OFFSET;
-                    x4 = successorX - ARROW_HORIZONTAL_OFFSET;
-                    x6 = successorX;
-                }
-
-                const pathSegments: React.ReactNode[] = [];
-                // const commonStrokeColor = "#8A8A8A"; // Replaced by conditional colors
-
-                // Segment 1: Initial horizontal from predecessor
-                pathSegments.push(
-                    <path
-                        key={`${predecessorId}-${task.id}-s1`}
-                        d={`M ${x1},${startY} H ${x2}`}
-                        fill="none"
-                        stroke={DEFAULT_STROKE_COLOR}
-                        strokeWidth={DEFAULT_STROKE_WIDTH}
-                    />
-                );
-
-                // Segment 2: First vertical (from predecessor)
-                pathSegments.push(
-                    <path
-                        key={`${predecessorId}-${task.id}-v1`}
-                        d={`M ${x2},${startY} V ${horizontalConnectingLineY}`}
-                        fill="none"
-                        stroke={DEFAULT_STROKE_COLOR}
-                        strokeWidth={DEFAULT_STROKE_WIDTH}
-                    />
-                );
-
-                // Segment 3: Main horizontal
-                pathSegments.push(
-                    <path
-                        key={`${predecessorId}-${task.id}-s2`}
-                        d={`M ${x2},${horizontalConnectingLineY} H ${x4}`}
-                        fill="none"
-                        stroke={DEFAULT_STROKE_COLOR}
-                        strokeWidth={DEFAULT_STROKE_WIDTH}
-                    />
-                );
-
-                // Segment 4: Second vertical (to successor)
-                pathSegments.push(
-                    <path
-                        key={`${predecessorId}-${task.id}-v2`}
-                        d={`M ${x4},${horizontalConnectingLineY} V ${endY}`}
-                        fill="none"
-                        stroke={DEFAULT_STROKE_COLOR}
-                        strokeWidth={DEFAULT_STROKE_WIDTH}
-                    />
-                );
-
-                // Segment 5: Final horizontal to successor (with arrowhead)
-                pathSegments.push(
-                    <path
-                        key={`${predecessorId}-${task.id}-s3-arrow`}
-                        d={`M ${x4},${endY} H ${x6}`}
-                        fill="none"
-                        stroke={DEFAULT_STROKE_COLOR} // Arrow segment usually matches default
-                        strokeWidth={DEFAULT_STROKE_WIDTH}
-                        markerEnd={`url(#${ARROW_HEAD_ID})`}
-                    />
-                );
-
-                arrowPaths.push(...pathSegments);
+                arrowPathElements.push(...generateArrowPathSegments({
+                    predecessorPos,
+                    successorPos,
+                    predecessorId,
+                    successorId: successorTask.id,
+                    taskHeight,
+                    rtl
+                }));
             });
         }
     });
 
-    if (arrowPaths.length === 0) {
+    if (arrowPathElements.length === 0) {
         return null;
     }
 
@@ -171,7 +184,7 @@ const DependencyArrows: React.FC<DependencyArrowsProps> = ({
                     <path d="M0,-5L10,0L0,5" fill={DEFAULT_STROKE_COLOR} /> {/* Arrowhead color matches default lines */}
                 </marker>
             </defs>
-            <g>{arrowPaths}</g>
+            <g>{arrowPathElements}</g>
         </svg>
     );
 };
