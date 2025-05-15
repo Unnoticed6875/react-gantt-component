@@ -89,8 +89,9 @@ const GanttChart: React.FC<GanttChartProps> = ({
     // State for expanded tasks
     const [expandedTaskIds, setExpandedTaskIds] = useState<Record<string, boolean>>(() => {
         const initialState: Record<string, boolean> = {};
-        // Initialize based on tasks that are parents
         tasks.forEach(task => {
+            // A task is considered a parent if any other task lists it as parentId
+            // And it doesn't have a parentId itself (i.e., it's a root-level parent or a sub-project parent)
             if (tasks.some(child => child.parentId === task.id)) {
                 initialState[task.id] = initialTasksOpen;
             }
@@ -105,6 +106,7 @@ const GanttChart: React.FC<GanttChartProps> = ({
         }));
     };
 
+    // The visibleTimelineTasks are for the timeline part, TaskList will manage its own display of all tasks (hierarchically)
     const visibleTimelineTasks = useMemo(() => {
         return getVisibleTasks(tasks, expandedTaskIds, hierarchicalTasks);
     }, [tasks, expandedTaskIds, hierarchicalTasks]);
@@ -346,11 +348,11 @@ const GanttChart: React.FC<GanttChartProps> = ({
                                 <TaskListHeader ganttHeaderHeight={DEFAULT_GANTT_HEADER_HEIGHT} />
                                 <ScrollArea className="flex-1">
                                     <TaskList
-                                        tasks={hierarchicalTasks}
+                                        tasks={tasks}
                                         rowHeight={rowHeight}
-                                        onTaskRowClick={(task) => console.log("Task clicked:", task.name)}
                                         expandedTaskIds={expandedTaskIds}
                                         onToggleExpansion={handleToggleTaskExpansion}
+                                        onTasksUpdate={onTasksUpdate || (() => { })}
                                     />
                                 </ScrollArea>
                             </div>

@@ -25,39 +25,47 @@ export const getHierarchicalTasks = (tasks: Task[]): Task[] => {
   const taskTree: Task[] = [];
   const visited = new Set<string>();
 
-  function buildTree(task: Task, level: number): Task[] {
-    visited.add(task.id);
-    const results: Task[] = [task]; // Task itself, without adding _level
-    const children = tasks
-      .filter((t) => t.parentId === task.id)
-      .sort((a, b) => a.start.getTime() - b.start.getTime()); // Optional: sort children by start date
+  // The tasks array coming in should already be sorted by the desired 'order'
+  // from the TaskList drag-and-drop logic, or initial load.
+  // We just need to build the hierarchy based on parentId links.
+
+  function buildTreeRecursively(
+    currentTask: Task,
+    allTasks: Task[],
+    resultList: Task[]
+  ) {
+    if (visited.has(currentTask.id)) return;
+    visited.add(currentTask.id);
+    resultList.push(currentTask);
+
+    const children = allTasks
+      .filter((t) => t.parentId === currentTask.id)
+      .sort((a, b) => a.order - b.order); // Sort children by their 'order' property
 
     for (const child of children) {
-      if (!visited.has(child.id)) {
-        results.push(...buildTree(child, level + 1));
-      }
+      buildTreeRecursively(child, allTasks, resultList);
     }
-    return results;
   }
 
-  const rootTasks = tasks.filter(
-    (task) => !task.parentId || !taskMap.has(task.parentId)
-  );
-  // Optional: sort root tasks by start date
-  rootTasks.sort((a, b) => a.start.getTime() - b.start.getTime());
+  // Get all root tasks (those without a parent or with a non-existent parent)
+  // and sort them by the 'order' property.
+  const rootTasks = tasks
+    .filter((task) => !task.parentId || !taskMap.has(task.parentId))
+    .sort((a, b) => a.order - b.order);
 
   for (const rootTask of rootTasks) {
-    if (!visited.has(rootTask.id)) {
-      taskTree.push(...buildTree(rootTask, 0));
-    }
+    buildTreeRecursively(rootTask, tasks, taskTree);
   }
 
-  // Add any orphaned tasks (tasks whose parentId doesn't exist or were part of a cycle not starting from a clear root)
-  // These will be treated as root-level tasks.
+  // Add any orphaned tasks not visited (should ideally not happen with good data)
   tasks.forEach((task) => {
     if (!visited.has(task.id)) {
-      // Add it as a root, and try to build its subtree if it has children not yet visited
-      taskTree.push(...buildTree(task, 0));
+      // Treat as a root and build its subtree, it will be appended at the end
+      // Its children will also be sorted by order
+      console.warn(
+        `getHierarchicalTasks: Found orphaned task ${task.id}, appending.`
+      );
+      buildTreeRecursively(task, tasks, taskTree);
     }
   });
 
@@ -65,37 +73,37 @@ export const getHierarchicalTasks = (tasks: Task[]): Task[] => {
 };
 
 export const getVisibleTasks = (
-  allFlatTasks: Task[],
+  allFlatTasks: Task[], // This is the raw tasks array, potentially unsorted or sorted differently
   expandedTaskIds: Record<string, boolean>,
-  hierarchicalSortedTasks: Task[] // Use the already sorted list as a base for order and structure
+  // hierarchicalSortedTasks is the result from getHierarchicalTasks, which is now sorted by 'order'
+  hierarchicalTasksByOrder: Task[]
 ): Task[] => {
   const visibleTasks: Task[] = [];
   const taskMap = new Map<string, Task>(
-    allFlatTasks.map((task) => [task.id, task])
+    allFlatTasks.map((task) => [task.id, task]) // Use allFlatTasks for the map to find parents by ID
   );
 
-  // Helper to check if all ancestors of a task are expanded
-  function areAncestorsExpanded(taskId: string | undefined): boolean {
-    if (!taskId) return true; // No parent means it's a root or effectively so
+  function areAncestorsExpanded(taskId: string | undefined | null): boolean {
+    if (!taskId) return true;
     const task = taskMap.get(taskId);
-    if (!task) return true; // Should not happen if data is consistent
+    if (!task) return true;
 
     if (task.parentId) {
-      // If it has a parent, that parent must be expanded, and its ancestors too
       if (!expandedTaskIds[task.parentId]) {
         return false;
       }
       return areAncestorsExpanded(task.parentId);
     }
-    return true; // Is a root task, or its parent was not found (treat as visible)
+    return true;
   }
 
-  for (const task of hierarchicalSortedTasks) {
-    if (!task.parentId) {
-      // Root tasks are always a candidate
-      visibleTasks.push(task);
+  // Iterate through the tasks already sorted by 'order' from getHierarchicalTasks
+  for (const task of hierarchicalTasksByOrder) {
+    if (!task.parentId || !taskMap.has(task.parentId)) {
+      // Check if it's a root task
+      visibleTasks.push(task); // Root tasks are candidates
     } else {
-      // For child tasks, only add if its direct parent is expanded AND all its ancestors were also expanded
+      // For child tasks, add if its direct parent is expanded AND all its ancestors are also expanded
       if (
         expandedTaskIds[task.parentId] &&
         areAncestorsExpanded(task.parentId)

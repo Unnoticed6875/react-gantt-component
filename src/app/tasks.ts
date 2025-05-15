@@ -8,6 +8,7 @@ export const myTasks: Task[] = [
     end: new Date(2025, 4, 5),
     progress: 100,
     type: "task",
+    order: 0,
   },
   {
     id: "t2",
@@ -18,6 +19,7 @@ export const myTasks: Task[] = [
     dependencies: ["t1"],
     type: "task",
     parentId: "t1",
+    order: 1,
   },
   {
     id: "t3",
@@ -27,6 +29,7 @@ export const myTasks: Task[] = [
     progress: 40,
     dependencies: ["t2"],
     type: "task",
+    order: 2,
   },
   {
     id: "t4",
@@ -36,6 +39,7 @@ export const myTasks: Task[] = [
     progress: 20,
     dependencies: ["t3"],
     type: "task",
+    order: 3,
   },
   {
     id: "t5",
@@ -45,6 +49,7 @@ export const myTasks: Task[] = [
     progress: 10,
     dependencies: ["t3"],
     type: "task",
+    order: 4,
   },
   {
     id: "t6",
@@ -53,6 +58,7 @@ export const myTasks: Task[] = [
     end: new Date(2025, 4, 6),
     progress: 90,
     type: "task",
+    order: 5,
   },
   {
     id: "t7",
@@ -62,6 +68,7 @@ export const myTasks: Task[] = [
     progress: 0,
     type: "milestone",
     dependencies: ["t4", "t5"],
+    order: 6,
   },
   {
     id: "t8",
@@ -71,6 +78,7 @@ export const myTasks: Task[] = [
     progress: 15,
     dependencies: ["t2"],
     type: "task",
+    order: 7,
   },
   {
     id: "t9",
@@ -80,6 +88,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t7"],
     type: "task",
+    order: 8,
   },
   {
     id: "t10",
@@ -89,6 +98,7 @@ export const myTasks: Task[] = [
     progress: 5,
     dependencies: ["t1"],
     type: "task",
+    order: 9,
   },
   {
     id: "t11",
@@ -98,6 +108,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t9", "t8"],
     type: "task",
+    order: 10,
   },
   {
     id: "t12",
@@ -108,6 +119,7 @@ export const myTasks: Task[] = [
     dependencies: ["t1"],
     type: "task",
     parentId: "t1",
+    order: 11,
   },
   {
     id: "t13",
@@ -117,6 +129,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t11"],
     type: "task",
+    order: 12,
   },
   {
     id: "t14",
@@ -127,6 +140,7 @@ export const myTasks: Task[] = [
     dependencies: ["t13"],
     type: "task",
     parentId: "t13",
+    order: 13,
   },
   {
     id: "t15",
@@ -137,6 +151,7 @@ export const myTasks: Task[] = [
     dependencies: ["t14"],
     type: "task",
     parentId: "t13",
+    order: 14,
   },
   {
     id: "t16",
@@ -146,6 +161,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t13"],
     type: "task",
+    order: 15,
   },
   {
     id: "t17",
@@ -155,6 +171,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t16"],
     type: "task",
+    order: 16,
   },
   {
     id: "t18",
@@ -164,6 +181,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t15", "t17"],
     type: "task",
+    order: 17,
   },
   {
     id: "t19",
@@ -173,6 +191,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t18"],
     type: "task",
+    order: 18,
   },
   {
     id: "t20",
@@ -182,6 +201,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t19"],
     type: "task",
+    order: 19,
   },
   {
     id: "t21",
@@ -191,6 +211,7 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t20"],
     type: "task",
+    order: 20,
   },
   {
     id: "t22",
@@ -200,5 +221,6 @@ export const myTasks: Task[] = [
     progress: 0,
     dependencies: ["t21"],
     type: "task",
+    order: 21,
   },
 ];
