@@ -12,6 +12,72 @@ import {
 } from "@/components/ui/tooltip";
 // date-fns imports are no longer needed here for drag calculations
 
+const HANDLE_WIDTH = 8;
+
+// Helper to generate unique IDs for dnd-kit
+const getDraggableId = (taskId: string, type: 'body' | 'left' | 'right') => {
+    return `task-${taskId}-${type}`;
+};
+
+interface ResizeHandleProps {
+    taskId: string;
+    task: Task; // Pass the whole task for original dates
+    type: 'left' | 'right';
+    isDraggingThisHandle: boolean;
+}
+
+const ResizeHandle: React.FC<ResizeHandleProps> = ({ taskId, task, type, isDraggingThisHandle }) => {
+    const { attributes, listeners, setNodeRef } = useDraggable({
+        id: getDraggableId(taskId, type),
+        data: {
+            type: type === 'left' ? 'task-resize-left' : 'task-resize-right',
+            task: task, // Pass the original task data
+            originalTaskDates: { start: task.start, end: task.end },
+        },
+    });
+
+    const handleStyle: React.CSSProperties = {
+        position: 'absolute',
+        top: 0,
+        bottom: 0,
+        width: `${HANDLE_WIDTH}px`,
+        zIndex: 10,
+        cursor: 'ew-resize',
+        [type]: 0, // Sets left: 0 or right: 0
+        backgroundColor: isDraggingThisHandle ? 'rgba(0,100,255,0.3)' : 'transparent',
+    };
+
+    return (
+        <div
+            ref={setNodeRef}
+            style={handleStyle}
+            {...listeners}
+            {...attributes}
+            className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
+            aria-label={`Resize task ${type}`}
+        />
+    );
+};
+
+interface TaskBarContentProps {
+    task: Task;
+}
+
+const TaskBarContent: React.FC<TaskBarContentProps> = ({ task }) => (
+    <div className="relative w-full h-full px-2 flex items-center overflow-hidden">
+        <span className="truncate select-none">{task.name}</span>
+        {task.progress !== undefined && (
+            <Progress
+                value={task.progress}
+                className="absolute top-0 left-0 h-full w-full !bg-primary/70 rounded-none opacity-50 group-hover:opacity-40 transition-opacity duration-150"
+            />
+        )}
+        <span className="truncate relative z-10 pl-1 select-none">
+            {task.progress !== undefined ? `(${task.progress}%)` : ''}
+        </span>
+    </div>
+);
+
 interface TaskBarProps {
     task: Task;
     taskBarStyle: React.CSSProperties; // Base style from Timeline
@@ -21,57 +87,25 @@ interface TaskBarProps {
     isOverlay?: boolean; // To style differently if it's a drag overlay
 }
 
-const HANDLE_WIDTH = 8;
-
-// Helper to generate unique IDs for dnd-kit
-const getDraggableId = (taskId: string, type: 'body' | 'left' | 'right') => {
-    return `task-${taskId}-${type}`;
-};
-
 export function TaskBar({ task, taskBarStyle, onTaskBarClick, isOverlay = false }: TaskBarProps) {
-    const {
-        attributes: bodyAttributes,
-        listeners: bodyListeners,
-        setNodeRef: setBodyNodeRef,
-        transform: bodyTransform,
-        isDragging: isBodyDragging
-    } = useDraggable({
-        id: getDraggableId(task.id, 'body'),
+    const { id: taskId, start, end } = task;
+
+    const { attributes: bodyAttributes, listeners: bodyListeners, setNodeRef: setBodyNodeRef, transform: bodyTransform, isDragging: isBodyDragging } = useDraggable({
+        id: getDraggableId(taskId, 'body'),
         data: {
             type: 'task-body',
             task: task,
-            originalTaskDates: { start: task.start, end: task.end }, // Pass original dates
+            originalTaskDates: { start, end },
         },
-        disabled: isOverlay,
+        disabled: isOverlay, // Disable dragging the body if it's an overlay (overlay is already being dragged by dnd-kit)
     });
 
-    const {
-        attributes: leftHandleAttributes,
-        listeners: leftHandleListeners,
-        setNodeRef: setLeftHandleNodeRef,
-        isDragging: isLeftHandleDragging
-    } = useDraggable({
-        id: getDraggableId(task.id, 'left'),
-        data: {
-            type: 'task-resize-left',
-            task: task,
-            originalTaskDates: { start: task.start, end: task.end },
-        },
-    });
-
-    const {
-        attributes: rightHandleAttributes,
-        listeners: rightHandleListeners,
-        setNodeRef: setRightHandleNodeRef,
-        isDragging: isRightHandleDragging
-    } = useDraggable({
-        id: getDraggableId(task.id, 'right'),
-        data: {
-            type: 'task-resize-right',
-            task: task,
-            originalTaskDates: { start: task.start, end: task.end },
-        },
-    });
+    // Check if left/right handles are being dragged to adjust main body opacity/interaction
+    // This requires isDragging state from individual useDraggable hooks for handles IF they were separate.
+    // For now, we get that from the ResizeHandle component, but it means TaskBar needs to know.
+    // Alternative: get isDragging from useDraggable directly here.
+    const { isDragging: isLeftHandleDragging } = useDraggable({ id: getDraggableId(taskId, 'left'), data: { type: 'task-resize-left', task, originalTaskDates: { start, end } } });
+    const { isDragging: isRightHandleDragging } = useDraggable({ id: getDraggableId(taskId, 'right'), data: { type: 'task-resize-right', task, originalTaskDates: { start, end } } });
 
     const isAnyPartDragging = isBodyDragging || isLeftHandleDragging || isRightHandleDragging;
 
@@ -85,36 +119,13 @@ export function TaskBar({ task, taskBarStyle, onTaskBarClick, isOverlay = false 
         { ...style, opacity: 0.3, transition: 'opacity 0.1s ease-in-out' } :
         style;
 
-    const handleWrapperStyle: React.CSSProperties = {
-        position: 'absolute',
-        top: 0,
-        bottom: 0,
-        width: `${HANDLE_WIDTH}px`,
-        zIndex: 10,
-        cursor: 'ew-resize',
-    };
-
     if (isOverlay) {
-        // Overlay is already styled by GanttChart's DragOverlay styles,
-        // but we might want to ensure it doesn't try to apply transforms again.
-        // The `taskBarStyle` passed to it from DragOverlay should be sufficient.
-        // This TaskBar instance is the one *in* the DragOverlay.
+        // Simplified overlay rendering, assuming taskBarStyle has all necessary styles
         return (
             <div style={taskBarStyle} className="bg-primary rounded text-primary-foreground text-xs flex items-center cursor-grabbing">
-                <div className="relative w-full h-full px-2 flex items-center overflow-hidden">
-                    <span className="truncate select-none">{task.name}</span>
-                    {task.progress !== undefined && (
-                        <Progress
-                            value={task.progress}
-                            className="absolute top-0 left-0 h-full w-full !bg-primary/70 rounded-none opacity-50"
-                        />
-                    )}
-                    <span className="truncate relative z-10 pl-1 select-none">
-                        {task.progress !== undefined ? `(${task.progress}%)` : ''}
-                    </span>
-                </div>
+                <TaskBarContent task={task} />
             </div>
-        )
+        );
     }
 
     return (
@@ -126,50 +137,15 @@ export function TaskBar({ task, taskBarStyle, onTaskBarClick, isOverlay = false 
                     {...bodyListeners}
                     {...bodyAttributes}
                     className="group relative bg-primary rounded overflow-hidden text-primary-foreground text-xs flex items-center cursor-grab"
-                    onClick={() => !isAnyPartDragging && onTaskBarClick?.(task)}
+                    onClick={() => !isAnyPartDragging && onTaskBarClick?.(task)} // Prevent click during any drag op
                 >
-                    <div
-                        ref={setLeftHandleNodeRef}
-                        style={{
-                            ...handleWrapperStyle,
-                            left: 0,
-                            backgroundColor: isLeftHandleDragging ? 'rgba(0,100,255,0.3)' : 'transparent'
-                        }}
-                        {...leftHandleListeners}
-                        {...leftHandleAttributes}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                    />
-
-                    <div className="relative w-full h-full px-2 flex items-center overflow-hidden">
-                        <span className="truncate select-none">{task.name}</span>
-                        {task.progress !== undefined && (
-                            <Progress
-                                value={task.progress}
-                                className="absolute top-0 left-0 h-full w-full !bg-primary/70 rounded-none opacity-50 group-hover:opacity-40 transition-opacity duration-150"
-                            />
-                        )}
-                        <span className="truncate relative z-10 pl-1 select-none">
-                            {task.progress !== undefined ? `(${task.progress}%)` : ''}
-                        </span>
-                    </div>
-
-                    <div
-                        ref={setRightHandleNodeRef}
-                        style={{
-                            ...handleWrapperStyle,
-                            right: 0,
-                            backgroundColor: isRightHandleDragging ? 'rgba(0,100,255,0.3)' : 'transparent'
-                        }}
-                        {...rightHandleListeners}
-                        {...rightHandleAttributes}
-                        className="opacity-0 group-hover:opacity-100 transition-opacity duration-150"
-                    />
+                    <ResizeHandle taskId={taskId} task={task} type="left" isDraggingThisHandle={isLeftHandleDragging} />
+                    <TaskBarContent task={task} />
+                    <ResizeHandle taskId={taskId} task={task} type="right" isDraggingThisHandle={isRightHandleDragging} />
                 </div>
             </TooltipTrigger>
             <TooltipContent>
-                <p>
-                    <strong>{task.name}</strong>
-                </p>
+                <p><strong>{task.name}</strong></p>
                 <p>ID: {task.id}</p>
                 <p>Start: {task.start.toLocaleDateString()}</p>
                 <p>End: {task.end.toLocaleDateString()}</p>
