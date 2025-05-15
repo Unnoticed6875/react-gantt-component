@@ -8,7 +8,7 @@ import {
     CollapsibleTrigger,
 } from "@/components/ui/collapsible";
 import { ChevronRight, GripVertical } from "lucide-react";
-import { DragDropContext, Droppable, Draggable, DropResult } from "@hello-pangea/dnd";
+import { Reorder, useDragControls } from "motion/react";
 
 interface TaskListItemProps {
     task: Task;
@@ -19,6 +19,7 @@ interface TaskListItemProps {
     isExpanded: boolean;
     onToggleExpansion: (taskId: string) => void;
     expandedTaskIds: Record<string, boolean>;
+    onChildReorderRequest: (parentId: string, reorderedChildren: Task[]) => void;
 }
 
 const TaskListItem: React.FC<TaskListItemProps> = ({
@@ -30,6 +31,7 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
     isExpanded,
     onToggleExpansion,
     expandedTaskIds,
+    onChildReorderRequest,
 }) => {
     const children = allTasks.filter((t) => t.parentId === task.id).sort((a, b) => a.order - b.order);
 
@@ -71,44 +73,27 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
                     {taskRowContent} {/* Parent task's own row content */}
                     <CollapsibleContent>
                         {isExpanded && (
-                            <Droppable droppableId={`children-of-${task.id}`} type={`CHILDREN_OF_${task.id}`}>
-                                {(provided) => ( // Correct: single function child for Droppable
-                                    <div
-                                        ref={provided.innerRef}
-                                        {...provided.droppableProps}
-                                        className="children-list-container min-h-[10px]" // Added min-height for empty droppable
-                                    >
-                                        {children.map((child, index) => (
-                                            <Draggable key={child.id} draggableId={child.id} index={index}>
-                                                {(providedDraggable, snapshotDraggable) => (
-                                                    <div
-                                                        ref={providedDraggable.innerRef}
-                                                        {...providedDraggable.draggableProps}
-                                                        className={`flex items-center draggable-child-item-container ${snapshotDraggable.isDragging ? 'bg-muted shadow-lg' : ''}`}
-                                                    >
-                                                        <div {...providedDraggable.dragHandleProps} className="p-1 cursor-grab flex-shrink-0 self-stretch flex items-center">
-                                                            <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                                        </div>
-                                                        <div className="flex-grow">
-                                                            <TaskListItem
-                                                                task={child}
-                                                                allTasks={allTasks}
-                                                                rowHeight={rowHeight}
-                                                                level={level + 1}
-                                                                onTaskRowClick={onTaskRowClick}
-                                                                isExpanded={!!expandedTaskIds[child.id]}
-                                                                onToggleExpansion={onToggleExpansion}
-                                                                expandedTaskIds={expandedTaskIds}
-                                                            />
-                                                        </div>
-                                                    </div>
-                                                )}
-                                            </Draggable>
-                                        ))}
-                                        {provided.placeholder} {/* Placeholder inside the droppable div */}
-                                    </div>
-                                )}
-                            </Droppable>
+                            <Reorder.Group
+                                values={children}
+                                onReorder={(newOrder) => onChildReorderRequest(task.id, newOrder)}
+                                axis="y"
+                                as="div"
+                                className="children-list-container min-h-[10px]" // Keep min-height for visual stability
+                            >
+                                {children.map((child) => (
+                                    <ChildReorderableItem
+                                        key={child.id}
+                                        childTask={child}
+                                        allTasks={allTasks}
+                                        rowHeight={rowHeight}
+                                        level={level + 1}
+                                        onTaskRowClick={onTaskRowClick}
+                                        expandedTaskIds={expandedTaskIds}
+                                        onToggleExpansion={onToggleExpansion}
+                                        onChildReorderRequest={onChildReorderRequest}
+                                    />
+                                ))}
+                            </Reorder.Group>
                         )}
                     </CollapsibleContent>
                 </div>
@@ -117,6 +102,67 @@ const TaskListItem: React.FC<TaskListItemProps> = ({
     } else {
         return <div className="w-full">{taskRowContent}</div>;
     }
+};
+
+interface ChildReorderableItemProps {
+    childTask: Task;
+    allTasks: Task[];
+    rowHeight: number;
+    level: number;
+    onTaskRowClick?: (task: Task) => void;
+    onToggleExpansion: (taskId: string) => void;
+    expandedTaskIds: Record<string, boolean>;
+    onChildReorderRequest: (parentId: string, reorderedChildren: Task[]) => void;
+}
+
+const ChildReorderableItem: React.FC<ChildReorderableItemProps> = ({
+    childTask,
+    allTasks,
+    rowHeight,
+    level,
+    onTaskRowClick,
+    onToggleExpansion,
+    expandedTaskIds,
+    onChildReorderRequest,
+}) => {
+    const dragControls = useDragControls();
+    return (
+        <Reorder.Item
+            key={childTask.id}
+            value={childTask}
+            as="div"
+            dragListener={false}
+            dragControls={dragControls}
+            className="draggable-child-item-container"
+            whileDrag={{
+                backgroundColor: "rgba(203, 213, 225, 0.8)",
+                boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)",
+                zIndex: 10,
+            }}
+        >
+            <div className="flex items-center w-full">
+                <div
+                    onPointerDown={(e) => { e.stopPropagation(); dragControls.start(e); }}
+                    className="p-1 cursor-grab flex-shrink-0 self-stretch flex items-center"
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-grow">
+                    <TaskListItem
+                        task={childTask}
+                        allTasks={allTasks}
+                        rowHeight={rowHeight}
+                        level={level}
+                        onTaskRowClick={onTaskRowClick}
+                        isExpanded={!!expandedTaskIds[childTask.id]}
+                        onToggleExpansion={onToggleExpansion}
+                        expandedTaskIds={expandedTaskIds}
+                        onChildReorderRequest={onChildReorderRequest}
+                    />
+                </div>
+            </div>
+        </Reorder.Item>
+    );
 };
 
 interface TaskListProps {
@@ -141,120 +187,153 @@ export function TaskList({
         [tasks]
     );
 
-    const handleDragEnd = (result: DropResult) => {
-        const { source, destination } = result;
-
-        if (!destination) return;
-        if (source.droppableId === destination.droppableId && source.index === destination.index) return;
-
-        const currentTasks = [...tasks]; // Current state of all tasks
-        let newRootTaskIdsOrder: string[] = initialRootTasks.map(t => t.id); // Default to current root order
-        const reorderedChildrenByParentId = new Map<string, string[]>();
-
-        if (source.droppableId === "taskListDroppable" && destination.droppableId === "taskListDroppable") {
-            // Case 1: Reordering root tasks
-            const rootIds = [...initialRootTasks.map(t => t.id)];
-            const [movedId] = rootIds.splice(source.index, 1);
-            rootIds.splice(destination.index, 0, movedId);
-            newRootTaskIdsOrder = rootIds;
-
-        } else if (source.droppableId.startsWith("children-of-") && source.droppableId === destination.droppableId) {
-            // Case 2: Reordering children within the same parent
-            const parentId = source.droppableId.replace("children-of-", "");
-            const childrenOfParentIds = currentTasks
-                .filter(t => t.parentId === parentId)
-                .sort((a, b) => a.order - b.order)
-                .map(t => t.id);
-
-            const [movedChildId] = childrenOfParentIds.splice(source.index, 1);
-            childrenOfParentIds.splice(destination.index, 0, movedChildId);
-            reorderedChildrenByParentId.set(parentId, childrenOfParentIds);
-        } else {
-            console.warn("Drag operation between different lists or levels is not supported.");
-            return;
-        }
-
+    const processTaskReorder = (
+        orderedRootTaskIds: string[],
+        childrenOrderMap: Map<string, string[]>
+    ) => {
         const finalOrderedTasks: Task[] = [];
         let globalOrderCounter = 0;
-        const taskMap = new Map(currentTasks.map(task => [task.id, task]));
+        const taskMap = new Map(tasks.map(task => [task.id, { ...task }])); // Operate on copies
 
-        function buildOrderedListRecursive(taskIds: string[]) {
-            for (const taskId of taskIds) {
+        function buildRecursive(currentLevelTaskIds: string[]) {
+            for (const taskId of currentLevelTaskIds) {
                 const task = taskMap.get(taskId);
-                if (!task) continue;
+                if (!task) {
+                    console.error(`Task not found in map: ${taskId}`);
+                    continue;
+                }
 
                 finalOrderedTasks.push({ ...task, order: globalOrderCounter++ });
 
-                let childrenIdsToProcess: string[];
-                if (reorderedChildrenByParentId.has(taskId)) {
-                    childrenIdsToProcess = reorderedChildrenByParentId.get(taskId)!;
+                let childIdsForThisTask: string[];
+                if (childrenOrderMap.has(taskId)) {
+                    childIdsForThisTask = childrenOrderMap.get(taskId)!;
                 } else {
-                    childrenIdsToProcess = currentTasks
+                    // Get children in their current persistent order
+                    childIdsForThisTask = tasks // from original tasks prop for stable current order
                         .filter(child => child.parentId === taskId)
                         .sort((a, b) => a.order - b.order)
                         .map(child => child.id);
                 }
-                if (childrenIdsToProcess.length > 0) {
-                    buildOrderedListRecursive(childrenIdsToProcess);
+
+                if (childIdsForThisTask.length > 0) {
+                    buildRecursive(childIdsForThisTask);
                 }
             }
         }
 
-        buildOrderedListRecursive(newRootTaskIdsOrder);
+        buildRecursive(orderedRootTaskIds);
 
         if (finalOrderedTasks.length !== tasks.length) {
             console.error(
-                "TaskList DragEnd: Mismatch in task count after reorder. " +
+                "TaskList Reorder: Mismatch in task count after reorder. " +
                 `Expected ${tasks.length}, got ${finalOrderedTasks.length}. State not updated.`
             );
+            // Potentially revert or handle error more gracefully
             return;
         }
         onTasksUpdate(finalOrderedTasks);
     };
 
+    const handleRootReorder = (newlyOrderedRootTasks: Task[]) => {
+        const rootTaskIds = newlyOrderedRootTasks.map(t => t.id);
+        processTaskReorder(rootTaskIds, new Map()); // No children reordered in this operation
+    };
+
+    const handleChildReorderRequest = (parentId: string, newlyOrderedChildren: Task[]) => {
+        const childrenReorderMap = new Map<string, string[]>();
+        childrenReorderMap.set(parentId, newlyOrderedChildren.map(c => c.id));
+        const currentRootTaskIds = initialRootTasks.map(t => t.id); // Root order remains the same
+        processTaskReorder(currentRootTaskIds, childrenReorderMap);
+    };
+
     return (
-        <DragDropContext onDragEnd={handleDragEnd}>
-            <Droppable droppableId="taskListDroppable" type="ROOT">
-                {(provided) => (
-                    <div
-                        className="bg-card border-r task-list-container"
-                        {...provided.droppableProps}
-                        ref={provided.innerRef}
-                        style={{ minHeight: '100px' }}
-                    >
-                        {initialRootTasks.map((task, index) => (
-                            <Draggable key={task.id} draggableId={task.id} index={index}>
-                                {(providedDraggable, snapshot) => (
-                                    <div
-                                        ref={providedDraggable.innerRef}
-                                        {...providedDraggable.draggableProps}
-                                        className={`draggable-root-item-container ${snapshot.isDragging ? 'bg-muted shadow-lg' : ''}`}
-                                    >
-                                        <div className="flex items-center w-full">
-                                            <div {...providedDraggable.dragHandleProps} className="p-1 cursor-grab flex-shrink-0 self-stretch flex items-center">
-                                                <GripVertical className="h-5 w-5 text-muted-foreground" />
-                                            </div>
-                                            <div className="flex-grow">
-                                                <TaskListItem
-                                                    task={task}
-                                                    allTasks={tasks}
-                                                    rowHeight={rowHeight}
-                                                    level={0}
-                                                    onTaskRowClick={onTaskRowClick}
-                                                    isExpanded={!!expandedTaskIds[task.id]}
-                                                    onToggleExpansion={onToggleExpansion}
-                                                    expandedTaskIds={expandedTaskIds}
-                                                />
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-                            </Draggable>
-                        ))}
-                        {provided.placeholder}
-                    </div>
-                )}
-            </Droppable>
-        </DragDropContext>
+        // <DragDropContext onDragEnd={handleDragEnd}> // Removed
+        // <Droppable droppableId="taskListDroppable" type="ROOT"> // Removed
+        //     {(provided) => ( // Removed
+        <Reorder.Group
+            values={initialRootTasks}
+            onReorder={handleRootReorder}
+            axis="y"
+            as="div" // Ensures it renders as a div
+            className="bg-card border-r task-list-container"
+            style={{ minHeight: '100px' }} // Keep min-height
+        >
+            {initialRootTasks.map((task) => (
+                <RootReorderableItem
+                    key={task.id}
+                    task={task}
+                    allTasks={tasks}
+                    rowHeight={rowHeight}
+                    onTaskRowClick={onTaskRowClick}
+                    expandedTaskIds={expandedTaskIds}
+                    onToggleExpansion={onToggleExpansion}
+                    onChildReorderRequest={handleChildReorderRequest}
+                />
+            ))}
+            {/* {provided.placeholder} // Removed */}
+        </Reorder.Group>
+        //     )} // Removed
+        // </Droppable> // Removed
+        // </DragDropContext> // Removed
     );
-} 
+}
+
+interface RootReorderableItemProps {
+    task: Task;
+    allTasks: Task[];
+    rowHeight: number;
+    onTaskRowClick?: (task: Task) => void;
+    expandedTaskIds: Record<string, boolean>;
+    onToggleExpansion: (taskId: string) => void;
+    onChildReorderRequest: (parentId: string, reorderedChildren: Task[]) => void;
+}
+
+const RootReorderableItem: React.FC<RootReorderableItemProps> = ({
+    task,
+    allTasks,
+    rowHeight,
+    onTaskRowClick,
+    expandedTaskIds,
+    onToggleExpansion,
+    onChildReorderRequest,
+}) => {
+    const dragControls = useDragControls();
+    return (
+        <Reorder.Item
+            key={task.id} // Key is good here, also on Reorder.Item from map
+            value={task}
+            as="div"
+            dragListener={false}
+            dragControls={dragControls}
+            className="draggable-root-item-container" // Base class
+            whileDrag={{
+                backgroundColor: "rgba(203, 213, 225, 0.8)", // Example: semi-transparent slate-300
+                boxShadow: "0 10px 15px -3px rgba(0,0,0,0.1), 0 4px 6px -2px rgba(0,0,0,0.05)", // Example: shadow-lg
+                zIndex: 10,
+            }}
+        >
+            <div className="flex items-center w-full">
+                <div
+                    onPointerDown={(e) => { e.stopPropagation(); dragControls.start(e); }}
+                    className="p-1 cursor-grab flex-shrink-0 self-stretch flex items-center"
+                >
+                    <GripVertical className="h-5 w-5 text-muted-foreground" />
+                </div>
+                <div className="flex-grow">
+                    <TaskListItem
+                        task={task}
+                        allTasks={allTasks}
+                        rowHeight={rowHeight}
+                        level={0}
+                        onTaskRowClick={onTaskRowClick}
+                        isExpanded={!!expandedTaskIds[task.id]}
+                        onToggleExpansion={onToggleExpansion}
+                        expandedTaskIds={expandedTaskIds}
+                        onChildReorderRequest={onChildReorderRequest}
+                    />
+                </div>
+            </div>
+        </Reorder.Item>
+    );
+}; 
